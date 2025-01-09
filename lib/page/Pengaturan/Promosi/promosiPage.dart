@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:salescheck/Model/diskonModel.dart';
+import 'package:salescheck/Model/outlets.dart';
+import 'package:salescheck/Model/promosi.dart';
+import 'package:salescheck/Service/ApiOutlet.dart';
+import 'package:salescheck/Service/ApiPromosi.dart';
 import 'package:salescheck/component/filterChip.dart';
 import 'package:salescheck/page/Pengaturan/Promosi/addPromosi.dart';
 import 'package:salescheck/page/Pengaturan/Promosi/editPromosi.dart';
@@ -19,220 +23,56 @@ class Promosipage extends StatefulWidget {
 }
 
 class _PromosipageState extends State<Promosipage> {
+  final Apioutlet _apioutlet = new Apioutlet();
+  final Apipromosi _apipromosi = new Apipromosi();
+  List<Outlets> outletList = [];
   TextEditingController search = new TextEditingController();
   final numberFormat =
       NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
   String searchQuery = '';
   List<Diskon> diskonList = [];
   List<Diskon> diskonListsearch = [];
-  List<String> outletOptions = [
-    'Semua',
-    'West Coast Coffee',
-    'North Coast Coffee',
-    'East Coast Coffee',
-    'South Coast Coffee'
-  ];
+  List<Promosi> promosiList = [];
+  List<Promosi> promosiListsearch = [];
+  List<String> outletOptions = [];
   List<String> statusOptions = ['Aktif', 'Expired', 'Promo terhapus', 'Semua'];
   int indexstatus = 3;
-  String? selectedOutlet;
+  String? selectedOutlet = 'Outle ABC';
+  Future<void> _readAndPrintProductPromosi() async {
+    // Ambil produk berdasarkan outlet dan kategori
+    promosiList = await _apipromosi.getPromosi();
+    if (_apipromosi.statusCode == 200) {
+      setState(() {
+        // Perbarui daftar promosi yang sudah difilter
+        promosiListsearch = promosiList.where((promosi) {
+          // Jika selectedOutlet adalah 'Semua', tampilkan semua promosi tanpa filter outlet
+          if (selectedOutlet == 'Semua') {
+            return true;
+          }
+
+          // Jika selectedOutlet bukan 'Semua', hanya tampilkan promosi yang memiliki outlet yang sesuai
+          return promosi.detailOutlet!.any((outlet) => outlet.nama!
+              .toLowerCase()
+              .contains(selectedOutlet!.toLowerCase()));
+        }).toList();
+      });
+    } else {}
+  }
+
   Future<void> _refreshData() async {
     // Simulasi delay untuk menunggu data baru
     await Future.delayed(const Duration(seconds: 2));
     diskonList.clear();
-    // Perbarui data dan setState untuk memperbarui tampilan
+
     setState(() {
-      diskonList = [
-        Diskon(
-            id: 1,
-            name: "Diskon Akhir Tahun",
-            tipeDiskon: "Percentage",
-            percentage: 20,
-            deskripsi: "Diskon 20% untuk semua pembelian akhir tahun.",
-            semuaOutlet: true,
-            minimalPembelian: 100000,
-            maxDiskon: 20000,
-            tanggalMulai: DateTime(2024, 12, 25),
-            tanggalBerakhir: DateTime(2024, 12, 31),
-            jamMulai: "00:00",
-            jamBerakhir: "23:59",
-            hariPromo: [
-              "Senin",
-              "Selasa",
-              "Rabu",
-              "Kamis",
-              "Jumat",
-              "Sabtu",
-              "Minggu"
-            ],
-            tipeAktivation: 'Manual',
-            status: 'aktif'),
-        Diskon(
-            id: 2,
-            name: "Promo Spesial Weekend",
-            tipeDiskon: "Nominal",
-            nominal: 15000,
-            deskripsi:
-                "Diskon Rp15.000 khusus akhir pekan di outlet North dan South Coast Coffee.",
-            semuaOutlet: false,
-            outlet: ["North Coast Coffee", "South Coast Coffee"],
-            minimalPembelian: 50000,
-            maxDiskon: null,
-            tanggalMulai: DateTime(2024, 11, 15),
-            tanggalBerakhir: DateTime(2024, 11, 17),
-            jamMulai: "08:00",
-            jamBerakhir: "20:00",
-            hariPromo: ["Sabtu", "Minggu"],
-            tipeAktivation: 'Manual',
-            status: 'aktif'),
-        Diskon(
-            id: 3,
-            name: "Diskon Ulang Tahun",
-            tipeDiskon: "Percentage",
-            percentage: 25,
-            deskripsi:
-                "Diskon 25% untuk perayaan hari ulang tahun di outlet West dan East Coast Coffee.",
-            semuaOutlet: false,
-            outlet: ["West Coast Coffee", "East Coast Coffee"],
-            minimalPembelian: 0,
-            maxDiskon: 25000,
-            tanggalMulai: DateTime(2024, 11, 10),
-            tanggalBerakhir: DateTime(2024, 11, 10),
-            jamMulai: "10:00",
-            jamBerakhir: "22:00",
-            hariPromo: ["Minggu"],
-            tipeAktivation: 'Otomatis',
-            status: 'promo terhapus'),
-        Diskon(
-            id: 4,
-            name: "Flash Sale",
-            tipeDiskon: "Nominal",
-            nominal: 20000,
-            deskripsi:
-                "Diskon Rp20.000 untuk Flash Sale selama dua jam di semua outlet.",
-            semuaOutlet: true,
-            minimalPembelian: 75000,
-            maxDiskon: null,
-            tanggalMulai: DateTime(2024, 11, 20),
-            tanggalBerakhir: DateTime(2024, 11, 20),
-            jamMulai: "14:00",
-            jamBerakhir: "16:00",
-            hariPromo: ["Rabu"],
-            tipeAktivation: 'Otomatis',
-            status: 'expired'),
-        Diskon(
-            id: 5,
-            name: "Promo Awal Tahun",
-            tipeDiskon: "Percentage",
-            percentage: 15,
-            deskripsi:
-                "Diskon 15% di outlet East Coast Coffee untuk menyambut tahun baru.",
-            semuaOutlet: false,
-            outlet: ["East Coast Coffee"],
-            minimalPembelian: 100000,
-            maxDiskon: 15000,
-            tanggalMulai: DateTime(2025, 1, 1),
-            tanggalBerakhir: DateTime(2025, 1, 7),
-            jamMulai: "00:00",
-            jamBerakhir: "23:59",
-            hariPromo: [
-              "Senin",
-              "Selasa",
-              "Rabu",
-              "Kamis",
-              "Jumat",
-              "Sabtu",
-              "Minggu"
-            ],
-            tipeAktivation: 'Otomatis',
-            status: 'aktif'),
-        Diskon(
-            id: 6,
-            name: "Promo Happy Hour",
-            tipeDiskon: "Nominal",
-            nominal: 10000,
-            deskripsi:
-                "Diskon Rp10.000 pada jam 14:00-16:00 setiap hari kerja.",
-            semuaOutlet: false,
-            outlet: ["West Coast Coffee", "South Coast Coffee"],
-            minimalPembelian: 50000,
-            maxDiskon: null,
-            tanggalMulai: DateTime(2024, 11, 15),
-            tanggalBerakhir: DateTime(2024, 12, 31),
-            jamMulai: "14:00",
-            jamBerakhir: "16:00",
-            hariPromo: ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"],
-            tipeAktivation: 'Manual',
-            status: 'aktif'),
-        Diskon(
-            id: 7,
-            name: "Promo Natal",
-            tipeDiskon: "Percentage",
-            percentage: 30,
-            deskripsi: "Diskon 30% untuk merayakan Natal di semua outlet.",
-            semuaOutlet: true,
-            minimalPembelian: 150000,
-            maxDiskon: 30000,
-            tanggalMulai: DateTime(2024, 12, 24),
-            tanggalBerakhir: DateTime(2024, 12, 25),
-            jamMulai: "00:00",
-            jamBerakhir: "23:59",
-            hariPromo: ["Selasa", "Rabu"],
-            tipeAktivation: 'Otomatis',
-            status: 'aktif'),
-        Diskon(
-            id: 8,
-            name: "Promo Lunch Deal",
-            tipeDiskon: "Nominal",
-            nominal: 12000,
-            deskripsi:
-                "Diskon Rp12.000 untuk pembelian pada jam makan siang di East Coast Coffee.",
-            semuaOutlet: false,
-            outlet: ["East Coast Coffee"],
-            minimalPembelian: 60000,
-            maxDiskon: null,
-            tanggalMulai: DateTime(2024, 11, 5),
-            tanggalBerakhir: DateTime(2024, 12, 5),
-            jamMulai: "12:00",
-            jamBerakhir: "14:00",
-            hariPromo: ["Senin", "Selasa", "Rabu", "Kamis", "Jumat"],
-            tipeAktivation: 'Manual',
-            status: 'promo terhapus'),
-        Diskon(
-            id: 9,
-            name: "Diskon Spesial Halloween",
-            tipeDiskon: "Percentage",
-            percentage: 10,
-            deskripsi:
-                "Diskon 10% khusus untuk perayaan Halloween di North Coast Coffee.",
-            semuaOutlet: false,
-            outlet: ["North Coast Coffee"],
-            minimalPembelian: 0,
-            maxDiskon: 10000,
-            tanggalMulai: DateTime(2024, 10, 31),
-            tanggalBerakhir: DateTime(2024, 10, 31),
-            jamMulai: "00:00",
-            jamBerakhir: "23:59",
-            hariPromo: ["Kamis"],
-            tipeAktivation: 'Manual',
-            status: 'aktif'),
-        Diskon(
-            id: 10,
-            name: "Diskon Spesial Member",
-            tipeDiskon: "Percentage",
-            percentage: 5,
-            deskripsi:
-                "Diskon 5% untuk member di semua outlet setiap hari Senin.",
-            semuaOutlet: true,
-            minimalPembelian: 50000,
-            maxDiskon: 5000,
-            tanggalMulai: DateTime(2024, 11, 1),
-            tanggalBerakhir: DateTime(2025, 1, 1),
-            jamMulai: "00:00",
-            jamBerakhir: "23:59",
-            hariPromo: ["Senin"],
-            tipeAktivation: 'Otomatis',
-            status: 'aktif'),
-      ];
+      promosiList.clear();
+      outletList.clear();
+      outletOptions.clear();
+      outletOptions = ['Semua'];
+      selectedOutlet = outletOptions.first;
+      // Perbarui data dan setState untuk memperbarui tampilan
+      _readAndPrintOutlet();
+      _readAndPrintProductPromosi();
       diskonListsearch = diskonList;
       searchfunction();
     });
@@ -240,7 +80,8 @@ class _PromosipageState extends State<Promosipage> {
 
   void notif(String title) {
     toastification.show(
-        margin: const EdgeInsets.only(right: 15),
+        alignment: Alignment.topCenter,
+        margin: const EdgeInsets.only(right: 16, left: 16),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         autoCloseDuration: const Duration(seconds: 8),
         progressBarTheme: const ProgressIndicatorThemeData(
@@ -274,50 +115,41 @@ class _PromosipageState extends State<Promosipage> {
   }
 
   void searchfunction() {
-    if (selectedOutlet != null && selectedOutlet!.toLowerCase() == 'semua') {
-      // Jika 'semua' dipilih, tampilkan semua diskon
-      setState(() {
-        diskonListsearch = diskonList;
-      });
-    } else if (selectedOutlet != null && selectedOutlet!.isNotEmpty) {
-      // Jika outlet spesifik dipilih, filter berdasarkan outlet tersebut atau semuaOutlet = true
-      setState(() {
-        diskonListsearch = diskonList
-            .where((item) =>
-                item
-                    .semuaOutlet || // Tambahkan item jika semuaOutlet bernilai true
-                item.outlet.any((outlet) =>
-                    outlet.toLowerCase() == selectedOutlet!.toLowerCase()))
-            .toList();
-      });
-      print(diskonListsearch.length); // Menampilkan jumlah hasil pencarian
-    } else {
-      // Jika tidak ada outlet dipilih atau input kosong, tampilkan semua diskon
-      setState(() {
-        diskonListsearch = diskonList;
-      });
-    }
+    setState(() {
+      // Perbarui daftar promosi yang sudah difilter
+      promosiListsearch = promosiList.where((promosi) {
+        // Jika selectedOutlet adalah 'Semua', tampilkan semua promosi tanpa filter outlet
+        if (selectedOutlet == 'Semua') {
+          return true;
+        }
+
+        // Jika selectedOutlet bukan 'Semua', hanya tampilkan promosi yang memiliki outlet yang sesuai
+        return promosi.detailOutlet!.any((outlet) =>
+            outlet.nama!.toLowerCase().contains(selectedOutlet!.toLowerCase()));
+      }).toList();
+    });
 
     if (indexstatus != 3) {
       String status = statusOptions[indexstatus];
-      if (status != null && status.isNotEmpty) {
+      if (status.isNotEmpty) {
         setState(() {
-          diskonListsearch = diskonListsearch.where((diskon) {
-            if (status.toLowerCase() ==
-                statusOptions[indexstatus].toLowerCase()) {
-              // Filter diskon berdasarkan status 'aktif'
-              return diskon.status.toLowerCase() ==
-                  statusOptions[indexstatus].toLowerCase();
-            } else if (status.toLowerCase() ==
-                statusOptions[indexstatus].toLowerCase()) {
-              // Filter diskon berdasarkan status 'expired'
-              return diskon.status.toLowerCase() ==
-                  statusOptions[indexstatus].toLowerCase();
-            } else if (status.toLowerCase() ==
-                statusOptions[indexstatus].toLowerCase()) {
-              // Filter diskon berdasarkan status 'promo terhapus'
-              return diskon.status.toLowerCase() ==
-                  statusOptions[indexstatus].toLowerCase();
+          promosiListsearch = promosiListsearch.where((promosi) {
+            // Jika status adalah 'Aktif'
+            if (status == 'Aktif') {
+              // Promosi dianggap aktif jika 'status' adalah 'Promosi Aktif' dan 'deletedAt' adalah null
+              return promosi.status == 'Promosi Aktif' &&
+                  promosi.deletedAt == null;
+            }
+            // Jika status adalah 'Expired'
+            else if (status == 'Expired') {
+              // Cek apakah promosi sudah expired, misalnya jika durasi promosi sudah lewat
+              return promosi.status == 'Promosi Tidak Aktif' &&
+                  promosi.deletedAt == null;
+            }
+            // Jika status adalah 'Promo terhapus'
+            else if (status == 'Promo terhapus') {
+              // Promo dianggap terhapus jika 'deletedAt' tidak null
+              return promosi.deletedAt != null;
             }
             return false; // Jika status tidak cocok
           }).toList();
@@ -333,39 +165,43 @@ class _PromosipageState extends State<Promosipage> {
     return '$mulai - $berakhir';
   }
 
-  String diskontypeFormat(Diskon diskon) {
-    if (diskon.tipeDiskon.toLowerCase() == 'percentage') {
-      return '${diskon.percentage} %';
+  String diskontypeFormat(Promosi promosi) {
+    if (promosi.kategoriPromosi!.toLowerCase() == '%') {
+      return '${promosi.nilaiKategori} %';
     } else {}
-    return '${diskon.nominal / 1000}rb';
+    return '${promosi.nilaiKategori! / 1000}rb';
   }
 
-  bool tipeOtomatis(Diskon diskon) {
-    if (diskon.tipeAktivation == 'Otomatis') {
+  bool tipeOtomatis(Promosi promosi) {
+    if (promosi.tipeAktivasi == 'Otomatis') {
       return true;
     } else {
       return false;
     }
   }
 
-  bool tipeDiskon(Diskon diskon) {
-    if (diskon.tipeDiskon.toLowerCase() == 'nominal') {
+  bool tipeDiskon(Promosi promosi) {
+    if (promosi.kategoriPromosi == 'Rp') {
       return true;
     } else {
       return false;
     }
   }
 
-  String outlet(Diskon diskon) {
-    if (diskon.semuaOutlet) {
-      return outletOptions.where((outlet) => outlet != 'Semua').join(', ');
+  String outlet(Promosi promosi) {
+    if (promosi.detailOutlet != null && promosi.detailOutlet!.isNotEmpty) {
+      return promosi.detailOutlet!
+          .map((outlet) => outlet.nama ?? '')
+          .where((nama) => nama.isNotEmpty)
+          .join(', ');
     } else {
-      return diskon.outlet.join(', ');
+      return promosi.detailOutlet!.join(
+          ', '); // Jika tidak ada detail outlet, return outlet dari diskon
     }
   }
 
-  String jadwal(Diskon diskon) {
-    return diskon.hariPromo.join(', ');
+  String jadwal(Promosi promosi) {
+    return promosi.pilihanHari!.join(', ');
   }
 
   String tanggal(Diskon diskon) {
@@ -374,15 +210,15 @@ class _PromosipageState extends State<Promosipage> {
     return '${formatTanggal.format(diskon.tanggalMulai)} - ${formatTanggal.format(diskon.tanggalBerakhir)}';
   }
 
-  bool statusDiskon(Diskon diskon) {
-    if (diskon.status == 'aktif') {
+  bool statusDiskon(Promosi promosi) {
+    if (promosi.status == 'Promosi Aktif') {
       return false;
     } else {
       return true;
     }
   }
 
-  void _quickAccesForm(BuildContext context, Diskon diskon) {
+  void _quickAccesForm(BuildContext context, Promosi promosi) {
     showModalBottomSheet(
       backgroundColor: const Color(0xFFFBFBFB),
       context: context,
@@ -432,7 +268,7 @@ class _PromosipageState extends State<Promosipage> {
                         ),
                         Flexible(
                           child: Text(
-                            tipeOtomatis(diskon) ? otomatis : manual,
+                            tipeOtomatis(promosi) ? otomatis : manual,
                             style: const TextStyle(
                                 fontWeight: FontWeight.w500,
                                 fontSize: 12,
@@ -443,7 +279,7 @@ class _PromosipageState extends State<Promosipage> {
                     ),
                   ),
                   Text(
-                    diskon.name,
+                    promosi.namaPromosi ?? '',
                     style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 18,
@@ -453,7 +289,7 @@ class _PromosipageState extends State<Promosipage> {
                     height: 12,
                   ),
                   Text(
-                    diskon.deskripsi,
+                    promosi.deskripsiPromosi ?? '',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -465,14 +301,14 @@ class _PromosipageState extends State<Promosipage> {
                     height: 16,
                   ),
                   labelForm('Outlet'),
-                  textForm(outlet(diskon)),
+                  textForm(outlet(promosi)),
                   labelForm('Kategori'),
                   textForm(
-                      '${diskon.tipeDiskon} ${tipeDiskon(diskon) ? diskontypeFormat(diskon) : diskontypeFormat(diskon)}'),
+                      'Potongan ${tipeDiskon(promosi) ? diskontypeFormat(promosi) : diskontypeFormat(promosi)}'),
                   labelForm('Tipe Aktivasi'),
-                  textForm(diskon.tipeAktivation),
+                  textForm(promosi.tipeAktivasi ?? ''),
                   labelForm('Minimal Pembelian'),
-                  textForm(numberFormat.format(diskon.minimalPembelian)),
+                  textForm(numberFormat.format(promosi.minimalBeli)),
                   Divider(
                     color: const Color(0xFF000000).withOpacity(0.1),
                   ),
@@ -480,11 +316,11 @@ class _PromosipageState extends State<Promosipage> {
                     height: 16,
                   ),
                   labelForm('Tanggal'),
-                  textForm(tanggal(diskon)),
+                  textForm(promosi.durasi ?? ''),
                   labelForm('Jam'),
-                  textForm('${diskon.jamMulai} - ${diskon.jamBerakhir}'),
+                  textForm('${promosi.jamMulai} - ${promosi.jamBerakhir}'),
                   labelForm('Hari Promo'),
-                  textForm(jadwal(diskon)),
+                  textForm(jadwal(promosi)),
                   Container(
                     color: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 10),
@@ -520,29 +356,22 @@ class _PromosipageState extends State<Promosipage> {
                                 final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                        builder: (context) =>
-                                            Editpromosi(diskon: diskon)));
+                                        builder: (context) => Editpromosi(
+                                            promosi: promosi,
+                                            outletOptions: outletList)));
 
                                 if (result != null) {
                                   final message = result['message'];
                                   final isDeleted = result['isDeleted'];
                                   // ignore: use_build_context_synchronously
 
-                                  print(message);
-                                  print(isDeleted);
                                   if (isDeleted == true) {
-                                    setState(() {
-                                      //delete item
-
-                                      // outlet.removeWhere(
-                                      //     (item) => item.noCab == outlet.noCabang);
-                                      diskonListsearch.removeWhere(
-                                          (item) => item.id == diskon.id);
-                                    });
                                     notif(message);
                                   } else {
                                     notif(message);
                                   }
+
+                                  _refreshData();
                                 }
                               },
                               child: const Text(
@@ -565,12 +394,25 @@ class _PromosipageState extends State<Promosipage> {
     );
   }
 
+  Future<void> _readAndPrintOutlet() async {
+    outletList = await _apioutlet.getAllOutletApi();
+
+    setState(() {
+      for (var element in outletList) {
+        outletOptions.add(element.namaOutlet ?? '');
+      }
+    });
+  }
+
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
+    outletOptions = ['Semua'];
     selectedOutlet = outletOptions.first;
     searchfunction;
+    _readAndPrintOutlet();
+    _readAndPrintProductPromosi();
   }
 
   @override
@@ -651,8 +493,9 @@ class _PromosipageState extends State<Promosipage> {
                             return DropdownMenuItem<String>(
                                 value: item,
                                 child: Container(
+                                  alignment: Alignment.centerLeft,
                                   padding: const EdgeInsets.only(
-                                      left: 12, right: 12, bottom: 4, top: 0),
+                                      left: 16, right: 16, bottom: 12, top: 12),
                                   width: double.infinity,
                                   decoration: const BoxDecoration(
                                       border: Border(
@@ -662,7 +505,7 @@ class _PromosipageState extends State<Promosipage> {
                                   child: Text(
                                     item,
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                       color: Color(0xFF717179),
                                     ),
@@ -675,21 +518,22 @@ class _PromosipageState extends State<Promosipage> {
                               selectedOutlet = value;
                               searchfunction();
                             });
-                            print(diskonListsearch.length);
                           },
                           buttonStyleData: const ButtonStyleData(
                             padding: EdgeInsets.symmetric(horizontal: 0),
                             height: 40,
-                            width: 213,
+                            width: double.infinity,
                           ),
                           menuItemStyleData: const MenuItemStyleData(
                             padding: EdgeInsets.symmetric(horizontal: 0),
-                            height: 30,
+                            height: 40,
                           ),
                           dropdownStyleData: const DropdownStyleData(
                               elevation: 4,
                               maxHeight: 160,
                               useSafeArea: true,
+                              width: 350,
+                              offset: Offset(-25, -15),
                               padding: EdgeInsets.zero,
                               decoration: BoxDecoration(
                                 borderRadius:
@@ -751,7 +595,6 @@ class _PromosipageState extends State<Promosipage> {
                       setState(() {
                         searchfunction();
                       });
-                      print(indexstatus);
                     },
                     child: Text(
                       statusOptions[index],
@@ -775,7 +618,7 @@ class _PromosipageState extends State<Promosipage> {
                   onRefresh: _refreshData,
                   child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
-                      child: diskonListsearch.isEmpty
+                      child: promosiListsearch.isEmpty
                           ? Container(
                               alignment: Alignment.center,
                               height: 375,
@@ -807,12 +650,12 @@ class _PromosipageState extends State<Promosipage> {
                               padding: const EdgeInsets.only(
                                   left: 16, right: 16, bottom: 16, top: 0),
                               shrinkWrap: true,
-                              itemCount: diskonListsearch.length,
+                              itemCount: promosiListsearch.length,
                               itemBuilder: (context, index) {
                                 return GestureDetector(
                                   onTap: () {
                                     _quickAccesForm(
-                                        context, diskonListsearch[index]);
+                                        context, promosiListsearch[index]);
                                   },
                                   child: Container(
                                     height: 66,
@@ -822,7 +665,7 @@ class _PromosipageState extends State<Promosipage> {
                                         vertical: 8, horizontal: 16),
                                     decoration: BoxDecoration(
                                         color: statusDiskon(
-                                                diskonListsearch[index])
+                                                promosiListsearch[index])
                                             ? const Color(0xFFEAEAED)
                                             : const Color(0xFFFFFFFF),
                                         borderRadius: const BorderRadius.all(
@@ -841,7 +684,9 @@ class _PromosipageState extends State<Promosipage> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             Text(
-                                              diskonListsearch[index].name,
+                                              promosiListsearch[index]
+                                                      .namaPromosi ??
+                                                  '',
                                               style: const TextStyle(
                                                   color: Color(0xFF303030),
                                                   fontSize: 14,
@@ -855,8 +700,9 @@ class _PromosipageState extends State<Promosipage> {
                                               mainAxisSize: MainAxisSize.min,
                                               children: [
                                                 Text(
-                                                  diskonListsearch[index]
-                                                      .tipeAktivation,
+                                                  promosiListsearch[index]
+                                                          .tipeAktivasi ??
+                                                      '',
                                                   style: const TextStyle(
                                                       color: Color(0xFF979899),
                                                       fontSize: 12,
@@ -874,11 +720,9 @@ class _PromosipageState extends State<Promosipage> {
                                                           FontWeight.w500),
                                                 ),
                                                 Text(
-                                                  formatTanggal(
-                                                      diskonListsearch[index]
-                                                          .tanggalMulai,
-                                                      diskonListsearch[index]
-                                                          .tanggalBerakhir),
+                                                  promosiListsearch[index]
+                                                          .durasi ??
+                                                      '',
                                                   style: const TextStyle(
                                                       color: Color(0xFF979899),
                                                       fontSize: 12,
@@ -899,7 +743,8 @@ class _PromosipageState extends State<Promosipage> {
                                               SvgPicture.asset(
                                                 'asset/promosi/receipt-disscount.svg',
                                                 color: statusDiskon(
-                                                        diskonListsearch[index])
+                                                        promosiListsearch[
+                                                            index])
                                                     ? const Color(0xFF717179)
                                                     : const Color(0xFF2E6CE9),
                                               ),
@@ -908,10 +753,10 @@ class _PromosipageState extends State<Promosipage> {
                                               ),
                                               Text(
                                                 diskontypeFormat(
-                                                    diskonListsearch[index]),
+                                                    promosiListsearch[index]),
                                                 style: TextStyle(
                                                     color: statusDiskon(
-                                                            diskonListsearch[
+                                                            promosiListsearch[
                                                                 index])
                                                         ? const Color(
                                                             0xFF717179)
@@ -943,10 +788,12 @@ class _PromosipageState extends State<Promosipage> {
                               final result = await Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                      builder: (context) =>
-                                          const Addpromosi()));
+                                      builder: (context) => Addpromosi(
+                                            outletOptions: outletList,
+                                          )));
                               if (result != null) {
                                 notif(result);
+                                _refreshData();
                               }
                             },
                             child: Container(

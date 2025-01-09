@@ -6,13 +6,15 @@ class Searchbar extends StatelessWidget {
   final double? height;
   final Function(String) onChanged;
   final TextEditingController controller;
+  final FocusNode? focus;
   const Searchbar(
       {super.key,
       required this.onChanged,
       required this.controller,
       this.hintText,
       this.margin,
-      this.height});
+      this.height,
+      this.focus});
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +43,10 @@ class Searchbar extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF09090B)),
               controller: controller,
+              focusNode: focus,
+              onTapOutside: (event) {
+                FocusScope.of(context).requestFocus(FocusNode());
+              },
               decoration: InputDecoration(
                   isDense: true,
                   border: InputBorder.none,

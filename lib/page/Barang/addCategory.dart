@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
+import 'package:salescheck/Service/Api.dart';
+import 'package:salescheck/Service/ApiCategory.dart';
 import 'package:salescheck/component/inputTextField.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Addcategory extends StatefulWidget {
   const Addcategory({super.key});
@@ -10,6 +13,7 @@ class Addcategory extends StatefulWidget {
 }
 
 class _AddcategoryState extends State<Addcategory> {
+  final Apicategory _api = new Apicategory();
   final TextEditingController namecontroler = TextEditingController();
   FocusNode _focusNodeName = FocusNode();
   bool focusname = false;
@@ -74,7 +78,7 @@ class _AddcategoryState extends State<Addcategory> {
                         const Text(
                           'Nama Kategori',
                           style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: Color(0xFF979899)),
                         ),
@@ -82,7 +86,6 @@ class _AddcategoryState extends State<Addcategory> {
                           height: 8,
                         ),
                         Inputtextfield(
-                            height: 47,
                             controller: namecontroler,
                             hintText: 'Masukkan Nama Kategori',
                             onChanged: (p0) {
@@ -111,8 +114,13 @@ class _AddcategoryState extends State<Addcategory> {
                         const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
                     decoration: const BoxDecoration(color: Color(0xFFF6F8FA)),
                     child: ElevatedButton(
-                        onPressed: () {
+                        onPressed: () async {
+                          final SharedPreferences prefs =
+                              await SharedPreferences.getInstance();
+                          final int idOutlet = prefs.getInt('id_outlet') ?? 0;
                           if (namecontroler.text.isNotEmpty) {
+                            await _api.addCategory(
+                                namecontroler.text, idOutlet);
                             Navigator.pop(context,
                                 'Kategori ${namecontroler.text} berhasil ditambahkan!');
                           } else {

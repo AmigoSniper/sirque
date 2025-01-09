@@ -31,6 +31,7 @@ class Customdropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      margin: margin,
       height: height,
       width: width ?? double.infinity,
       alignment: alignment,
@@ -81,7 +82,7 @@ class Customdropdown extends StatelessWidget {
                 child: Container(
                   alignment: Alignment.centerLeft,
                   padding: const EdgeInsets.only(
-                      left: 12, right: 12, bottom: 4, top: 0),
+                      left: 16, right: 16, bottom: 12, top: 12),
                   width: double.infinity,
                   decoration: const BoxDecoration(
                       border: Border(
@@ -112,6 +113,7 @@ class Customdropdown extends StatelessWidget {
           dropdownStyleData: const DropdownStyleData(
               elevation: 4,
               maxHeight: 160,
+              offset: Offset(-12, -7),
               useSafeArea: true,
               padding: EdgeInsets.zero,
               decoration: BoxDecoration(

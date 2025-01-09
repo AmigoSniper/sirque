@@ -4,7 +4,14 @@ import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
 
 import 'package:dropdown_button2/dropdown_button2.dart';
+import 'package:salescheck/Model/chartData.dart';
 import 'package:salescheck/page/Detailorder/detailorder.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../Model/Transaksi.dart';
+import '../../Service/ApiDasboard.dart';
+import '../../Service/ApiTransaksi.dart';
+import '../../component/notifError.dart';
 
 class Transaksipage extends StatefulWidget {
   const Transaksipage({super.key});
@@ -15,6 +22,12 @@ class Transaksipage extends StatefulWidget {
 
 class _TransaksipageState extends State<Transaksipage> {
   final ScrollController _scrollController = ScrollController();
+  late Future<void> _loadDataFuture;
+  late Future<void> _loadDataFutureChart;
+  final Apitransaksi _apitransaksi = Apitransaksi();
+  final Apidasboard _apiDasbord = Apidasboard();
+  List<Transaksi> transaksiList = [];
+  List<chartData> _chartData = [];
   String tunai = 'asset/image/pembayaranTunai.svg';
   String eWallet = 'asset/image/pembayaranEwallet.svg';
   String transfer = 'asset/image/pembayaranTransfer.svg';
@@ -31,6 +44,10 @@ class _TransaksipageState extends State<Transaksipage> {
     'Oktober',
     'November',
     'Desember'
+  ];
+  final List<String> chart = [
+    'Tahun ini',
+    'Bulan ini',
   ];
   final numberFormat =
       NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
@@ -137,7 +154,7 @@ class _TransaksipageState extends State<Transaksipage> {
   }
 
   String pembayaran(String jenis) {
-    if (jenis.toLowerCase() == "tunai") {
+    if (jenis.toLowerCase() == "cash") {
       return tunai;
     } else if (jenis.toLowerCase() == "transfer") {
       return transfer;
@@ -149,14 +166,56 @@ class _TransaksipageState extends State<Transaksipage> {
   }
 
   String? selectedValue;
+  int bulan = DateTime.now().month;
+  String? selectedChart;
 
   late int showingTooltip;
+  Future<void> getTransaksi() async {
+    final prefs = await SharedPreferences.getInstance();
+    final int idOutlet = prefs.getInt('id_outlet') ?? 0;
+    transaksiList =
+        await _apitransaksi.getTransaksibyMonth(idOutlet, bulan - 1);
+    if (_apitransaksi.statusCode == 200 || _apitransaksi.statusCode == 201) {
+      setState(() {
+        transaksiList = transaksiList;
+      });
+    } else {
+      Notiferror.showNotif(
+          context: context, description: _apitransaksi.message);
+    }
+  }
+
+  Future<void> getChart() async {
+    final prefs = await SharedPreferences.getInstance();
+    final int idOutlet = prefs.getInt('id_outlet') ?? 0;
+    _chartData =
+        await _apiDasbord.getChart(selectedChart ?? chart.first, idOutlet);
+    await Future.delayed(Duration(seconds: 2));
+    if (_apiDasbord.statusCode == 200 || _apiDasbord.statusCode == 201) {
+      setState(() {
+        touchedGroupIndex = -1;
+        _chartData = _chartData;
+      });
+    } else {
+      Notiferror.showNotif(
+          context: context, description: _apitransaksi.message);
+    }
+  }
 
   @override
   void initState() {
     showingTooltip = -1;
-    selectedValue = months[0];
+    selectedValue = months[bulan - 1];
+    selectedChart = chart.first;
+    _loadDataFuture = getTransaksi();
+    _loadDataFutureChart = getChart();
     super.initState();
+  }
+
+  Future<void> _refreshData() async {
+    transaksiList.clear();
+
+    _loadDataFuture = getTransaksi();
   }
 
   BarChartGroupData generateGroupData(int x, int y, bool touch) {
@@ -234,7 +293,7 @@ class _TransaksipageState extends State<Transaksipage> {
                         isDense: false,
                         isExpanded: true,
                         selectedItemBuilder: (context) {
-                          return months.map((String item) {
+                          return chart.map((String item) {
                             return Align(
                               alignment: Alignment.centerLeft,
                               child: Text(
@@ -249,12 +308,12 @@ class _TransaksipageState extends State<Transaksipage> {
                             );
                           }).toList();
                         },
-                        items: months
+                        items: chart
                             .map((String item) => DropdownMenuItem<String>(
                                 value: item,
                                 child: Container(
                                   padding: const EdgeInsets.only(
-                                      left: 12, right: 12, bottom: 4, top: 0),
+                                      left: 16, right: 16, bottom: 12, top: 12),
                                   width: double.infinity,
                                   decoration: const BoxDecoration(
                                       border: Border(
@@ -264,16 +323,18 @@ class _TransaksipageState extends State<Transaksipage> {
                                   child: Text(
                                     item,
                                     style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF576067)),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Color(0xFF717179),
+                                    ),
                                   ),
                                 )))
                             .toList(),
-                        value: selectedValue,
+                        value: selectedChart,
                         onChanged: (String? value) {
                           setState(() {
-                            selectedValue = value;
+                            selectedChart = value;
+                            _loadDataFutureChart = getChart();
                           });
                         },
                         buttonStyleData: const ButtonStyleData(
@@ -282,11 +343,11 @@ class _TransaksipageState extends State<Transaksipage> {
                           width: 20,
                         ),
                         menuItemStyleData: const MenuItemStyleData(
-                          height: 30,
+                          height: 40,
                           padding: EdgeInsets.symmetric(horizontal: 0),
                         ),
                         dropdownStyleData: const DropdownStyleData(
-                            width: 90,
+                            width: 100,
                             maxHeight: 200,
                             offset: Offset(-5, -5),
                             useSafeArea: true,
@@ -301,254 +362,516 @@ class _TransaksipageState extends State<Transaksipage> {
                   )
                 ],
               )),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
-            child: Container(
-                height: 200,
-                padding:
-                    const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
-                decoration: const BoxDecoration(
-                    color: Color(0xFFFFFFFF),
-                    borderRadius: BorderRadius.all(Radius.circular(10))),
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: 600,
-                    child: BarChart(
-                        swapAnimationDuration:
-                            const Duration(milliseconds: 150),
-                        swapAnimationCurve: Curves.linear,
-                        BarChartData(
-                          alignment: BarChartAlignment.start,
-                          barTouchData: BarTouchData(
-                            enabled: true,
-                            touchTooltipData: BarTouchTooltipData(
-                              fitInsideVertically: true,
-                              fitInsideHorizontally: true,
-                              tooltipHorizontalOffset: 10,
-                              getTooltipColor: (group) =>
-                                  const Color(0xFFFFFFFF),
-                              getTooltipItem:
-                                  (group, groupIndex, rod, rodIndex) {
-                                String month = [
-                                  'Januari',
-                                  'Februari',
-                                  'Maret',
-                                  'April',
-                                  'Mei',
-                                  'Juni',
-                                  'Juli',
-                                  'Augustus',
-                                  'September',
-                                  'Oktober',
-                                  'November',
-                                  'Desember'
-                                ][group.x - 1];
-                                String formattedValue;
-                                int value = rod.toY.toInt();
-                                if (value >= 1000000000000) {
-                                  // Untuk triliunan
-                                  formattedValue =
-                                      '${(value / 1000000000000).toStringAsFixed(1)} T';
-                                } else if (value >= 1000000000) {
-                                  // Untuk miliaran
-                                  formattedValue =
-                                      '${(value / 1000000000).toStringAsFixed(1)} M';
-                                } else if (value >= 1000000) {
-                                  // Untuk jutaan
-                                  formattedValue =
-                                      '${(value / 1000000).toStringAsFixed(1)} Jt';
-                                } else if (value >= 1000) {
-                                  // Untuk ribuan
-                                  formattedValue =
-                                      '${(value / 1000).toStringAsFixed(0)} Rb';
-                                } else {
-                                  // Untuk angka di bawah ribuan
-                                  formattedValue = value.toStringAsFixed(0);
-                                }
+          FutureBuilder(
+            future: _loadDataFutureChart,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Padding(
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 15, horizontal: 15),
+                    child: Container(
+                        alignment: Alignment.center,
+                        height: 200,
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 15, horizontal: 15),
+                        decoration: const BoxDecoration(
+                            color: Color(0xFFFFFFFF),
+                            borderRadius:
+                                BorderRadius.all(Radius.circular(10))),
+                        child: const CircularProgressIndicator()));
+              } else if (snapshot.hasError) {
+                return Container(
+                    alignment: Alignment.center,
+                    height: 200,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        SvgPicture.asset(
+                          'asset/pegawai/Group 33979.svg',
+                          width: 105,
+                          height: 105,
+                        ),
+                        const SizedBox(
+                          height: 12,
+                        ),
+                        const Text(
+                          'Belum ada data barang tersedia',
+                          style: TextStyle(
+                              color: Color(0xFFB1B5C0),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500),
+                        )
+                      ],
+                    ));
+              } else {
+                return Padding(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 15, horizontal: 15),
+                  child: Container(
+                      height: 200,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 15, horizontal: 15),
+                      decoration: const BoxDecoration(
+                          color: Color(0xFFFFFFFF),
+                          borderRadius: BorderRadius.all(Radius.circular(10))),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: SizedBox(
+                          width: selectedChart == 'Tahun ini' ? 600 : 1200,
+                          child: selectedChart == 'Tahun ini'
+                              ? BarChart(
+                                  swapAnimationDuration:
+                                      const Duration(milliseconds: 150),
+                                  swapAnimationCurve: Curves.linear,
+                                  BarChartData(
+                                      alignment: BarChartAlignment.start,
+                                      barTouchData: BarTouchData(
+                                        enabled: true,
+                                        touchTooltipData: BarTouchTooltipData(
+                                          fitInsideVertically: true,
+                                          fitInsideHorizontally: true,
+                                          tooltipHorizontalOffset: 10,
+                                          getTooltipColor: (group) =>
+                                              const Color(0xFFFFFFFF),
+                                          getTooltipItem: (group, groupIndex,
+                                              rod, rodIndex) {
+                                            String month = [
+                                              'Januari',
+                                              'Februari',
+                                              'Maret',
+                                              'April',
+                                              'Mei',
+                                              'Juni',
+                                              'Juli',
+                                              'Augustus',
+                                              'September',
+                                              'Oktober',
+                                              'November',
+                                              'Desember'
+                                            ][group.x - 1];
+                                            String formattedValue;
+                                            int value = rod.toY.toInt();
+                                            if (value >= 1000000000000) {
+                                              // Untuk triliunan
+                                              formattedValue =
+                                                  '${(value / 1000000000000).toStringAsFixed(1)} T';
+                                            } else if (value >= 1000000000) {
+                                              // Untuk miliaran
+                                              formattedValue =
+                                                  '${(value / 1000000000).toStringAsFixed(1)} M';
+                                            } else if (value >= 1000000) {
+                                              // Untuk jutaan
+                                              formattedValue =
+                                                  '${(value / 1000000).toStringAsFixed(1)} Jt';
+                                            } else if (value >= 1000) {
+                                              // Untuk ribuan
+                                              formattedValue =
+                                                  '${(value / 1000).toStringAsFixed(0)} Rb';
+                                            } else {
+                                              // Untuk angka di bawah ribuan
+                                              formattedValue =
+                                                  value.toStringAsFixed(0);
+                                            }
 
-                                return BarTooltipItem(
-                                    '$formattedValue',
-                                    const TextStyle(
-                                        color: Color(0xFF2E6CE9),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600),
-                                    children: [
-                                      TextSpan(
-                                          text: ' pada bulan $month',
-                                          style: const TextStyle(
-                                              color: Color(0xFF848484)))
-                                    ]);
-                              },
-                            ),
-                            touchCallback:
-                                (FlTouchEvent event, barTouchResponse) {
-                              if (event is FlTapUpEvent &&
-                                  barTouchResponse != null) {
-                                setState(() {
-                                  if (touchedGroupIndex ==
-                                      barTouchResponse
-                                          .spot!.touchedBarGroupIndex) {
-                                    touchedGroupIndex = -1;
-                                  } else {
-                                    touchedGroupIndex = barTouchResponse
-                                        .spot!.touchedBarGroupIndex;
-                                  }
-                                });
-                              }
-                            },
-                          ),
-                          gridData: FlGridData(
-                            drawVerticalLine: false,
-                            drawHorizontalLine: true,
-                            horizontalInterval:
-                                getHighestAmount(datatransaksi) / 4,
-                            getDrawingHorizontalLine: (value) {
-                              return const FlLine(
-                                  strokeWidth: 1,
-                                  dashArray: [2, 4],
-                                  color: Color(0xFFB1B5C0));
-                            },
-                          ),
-                          borderData: FlBorderData(show: false),
-                          titlesData: FlTitlesData(
-                            leftTitles: AxisTitles(
-                                drawBelowEverything: false,
-                                axisNameSize: 8,
-                                sideTitles: SideTitles(
-                                  maxIncluded: false,
-                                  reservedSize: 35,
-                                  showTitles: true,
-                                  interval: getHighestAmount(datatransaksi) / 4,
-                                  getTitlesWidget: (value, meta) {
-                                    String formattedValue;
-                                    if (value >= 1000000000000) {
-                                      // Untuk triliunan
-                                      formattedValue =
-                                          '${(value / 1000000000000).toStringAsFixed(0)} T';
-                                    } else if (value >= 1000000000) {
-                                      // Untuk miliaran
-                                      formattedValue =
-                                          '${(value / 1000000000).toStringAsFixed(0)} M';
-                                    } else if (value >= 1000000) {
-                                      // Untuk jutaan
-                                      formattedValue =
-                                          '${(value / 1000000).toStringAsFixed(0)} Jt';
-                                    } else if (value >= 1000) {
-                                      // Untuk ribuan
-                                      formattedValue =
-                                          '${(value / 1000).toStringAsFixed(0)} Rb';
-                                    } else {
-                                      // Untuk angka di bawah ribuan
-                                      formattedValue = value.toStringAsFixed(0);
-                                    }
+                                            return BarTooltipItem(
+                                                formattedValue,
+                                                const TextStyle(
+                                                    color: Color(0xFF2E6CE9),
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.w600),
+                                                children: [
+                                                  TextSpan(
+                                                      text:
+                                                          ' pada bulan $month',
+                                                      style: const TextStyle(
+                                                          color: Color(
+                                                              0xFF848484)))
+                                                ]);
+                                          },
+                                        ),
+                                        touchCallback: (FlTouchEvent event,
+                                            barTouchResponse) {
+                                          if (event is FlTapUpEvent &&
+                                              barTouchResponse != null) {
+                                            setState(() {
+                                              if (touchedGroupIndex ==
+                                                  barTouchResponse.spot!
+                                                      .touchedBarGroupIndex) {
+                                                touchedGroupIndex = -1;
+                                              } else {
+                                                touchedGroupIndex =
+                                                    barTouchResponse.spot!
+                                                        .touchedBarGroupIndex;
+                                              }
+                                            });
+                                          }
+                                        },
+                                      ),
+                                      gridData: FlGridData(
+                                        drawVerticalLine: false,
+                                        drawHorizontalLine: true,
+                                        horizontalInterval: int.parse(
+                                                _chartData.first.maxSumbuX!) /
+                                            4,
+                                        getDrawingHorizontalLine: (value) {
+                                          return const FlLine(
+                                              strokeWidth: 1,
+                                              dashArray: [2, 4],
+                                              color: Color(0xFFB1B5C0));
+                                        },
+                                      ),
+                                      borderData: FlBorderData(show: false),
+                                      titlesData: FlTitlesData(
+                                        leftTitles: AxisTitles(
+                                            drawBelowEverything: false,
+                                            axisNameSize: 8,
+                                            sideTitles: SideTitles(
+                                              maxIncluded: false,
+                                              reservedSize: 35,
+                                              showTitles: true,
+                                              interval: int.parse(_chartData
+                                                      .first.maxSumbuX!) /
+                                                  4,
+                                              getTitlesWidget: (value, meta) {
+                                                String formattedValue;
+                                                if (value >= 1000000000000) {
+                                                  // Untuk triliunan
+                                                  formattedValue =
+                                                      '${(value / 1000000000000).toStringAsFixed(0)} T';
+                                                } else if (value >=
+                                                    1000000000) {
+                                                  // Untuk miliaran
+                                                  formattedValue =
+                                                      '${(value / 1000000000).toStringAsFixed(0)} M';
+                                                } else if (value >= 1000000) {
+                                                  // Untuk jutaan
+                                                  formattedValue =
+                                                      '${(value / 1000000).toStringAsFixed(0)} Jt';
+                                                } else if (value >= 1000) {
+                                                  // Untuk ribuan
+                                                  formattedValue =
+                                                      '${(value / 1000).toStringAsFixed(0)} Rb';
+                                                } else {
+                                                  // Untuk angka di bawah ribuan
+                                                  formattedValue =
+                                                      value.toStringAsFixed(0);
+                                                }
 
-                                    return Padding(
-                                      padding: const EdgeInsets.only(right: 1),
-                                      child: Text(
-                                        formattedValue,
-                                        style: const TextStyle(
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF303030),
+                                                return Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          right: 1),
+                                                  child: Text(
+                                                    formattedValue,
+                                                    style: const TextStyle(
+                                                      fontSize: 8,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Color(0xFF303030),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            )),
+                                        topTitles: const AxisTitles(
+                                            sideTitles:
+                                                SideTitles(showTitles: false)),
+                                        rightTitles: const AxisTitles(
+                                            sideTitles:
+                                                SideTitles(showTitles: false)),
+                                        bottomTitles: AxisTitles(
+                                          sideTitles: SideTitles(
+                                            showTitles: true,
+                                            getTitlesWidget:
+                                                (double value, TitleMeta meta) {
+                                              const months = [
+                                                'Jan',
+                                                'Feb',
+                                                'Mar',
+                                                'Apr',
+                                                'May',
+                                                'Jun',
+                                                'Jul',
+                                                'Aug',
+                                                'Sep',
+                                                'Oct',
+                                                'Nov',
+                                                'Dec'
+                                              ];
+                                              return Text(
+                                                months[value.toInt() - 1],
+                                                style: TextStyle(
+                                                    fontSize: 8,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: value.toInt() - 1 ==
+                                                            touchedGroupIndex
+                                                        ? const Color(
+                                                            0xFF303030)
+                                                        : const Color(
+                                                            0xFF717179)),
+                                              );
+                                            },
+                                          ),
                                         ),
                                       ),
-                                    );
-                                  },
-                                )),
-                            topTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false)),
-                            rightTitles: const AxisTitles(
-                                sideTitles: SideTitles(showTitles: false)),
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                getTitlesWidget:
-                                    (double value, TitleMeta meta) {
-                                  const months = [
-                                    'Jan',
-                                    'Feb',
-                                    'Mar',
-                                    'Apr',
-                                    'May',
-                                    'Jun',
-                                    'Jul',
-                                    'Aug',
-                                    'Sep',
-                                    'Oct',
-                                    'Nov',
-                                    'Dec'
-                                  ];
-                                  return Text(
-                                    months[value.toInt() - 1],
-                                    style: TextStyle(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.w500,
-                                        color: value.toInt() - 1 ==
-                                                touchedGroupIndex
-                                            ? const Color(0xFF303030)
-                                            : const Color(0xFF717179)),
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          maxY: getHighestAmount(datatransaksi) +
-                              getHighestAmount(datatransaksi) * 0.05,
-                          minY: 0,
-                          barGroups: [
-                            generateGroupData(
-                                1,
-                                datatransaksi['data']?[0]["amount"],
-                                touchedGroupIndex == 0),
-                            generateGroupData(
-                                2,
-                                datatransaksi['data']?[1]["amount"],
-                                touchedGroupIndex == 1),
-                            generateGroupData(
-                                3,
-                                datatransaksi['data']?[2]["amount"],
-                                touchedGroupIndex == 2),
-                            generateGroupData(
-                                4,
-                                datatransaksi['data']?[3]["amount"],
-                                touchedGroupIndex == 3),
-                            generateGroupData(
-                                5,
-                                datatransaksi['data']?[4]["amount"],
-                                touchedGroupIndex == 4),
-                            generateGroupData(
-                                6,
-                                datatransaksi['data']?[5]["amount"],
-                                touchedGroupIndex == 5),
-                            generateGroupData(
-                                7,
-                                datatransaksi['data']?[6]["amount"],
-                                touchedGroupIndex == 6),
-                            generateGroupData(
-                                8,
-                                datatransaksi['data']?[7]["amount"],
-                                touchedGroupIndex == 7),
-                            generateGroupData(
-                                9,
-                                datatransaksi['data']?[8]["amount"],
-                                touchedGroupIndex == 8),
-                            generateGroupData(
-                                10,
-                                datatransaksi['data']?[9]["amount"],
-                                touchedGroupIndex == 9),
-                            generateGroupData(
-                                11,
-                                datatransaksi['data']?[10]["amount"],
-                                touchedGroupIndex == 10),
-                            generateGroupData(
-                                12,
-                                datatransaksi['data']?[11]["amount"],
-                                touchedGroupIndex == 11),
-                          ],
-                        )),
-                  ),
-                )),
+                                      maxY: int.parse(
+                                              _chartData.first.maxSumbuX!) +
+                                          int.parse(
+                                                  _chartData.first.maxSumbuX!) *
+                                              0.05,
+                                      minY: 0,
+                                      barGroups: List.generate(
+                                        _chartData.length,
+                                        (index) => generateGroupData(
+                                          index + 1,
+                                          int.parse(
+                                              _chartData[index].total ?? '0'),
+                                          touchedGroupIndex == index,
+                                        ),
+                                      )))
+                              : BarChart(
+                                  swapAnimationDuration:
+                                      const Duration(milliseconds: 150),
+                                  swapAnimationCurve: Curves.linear,
+                                  BarChartData(
+                                      alignment: BarChartAlignment.start,
+                                      barTouchData: BarTouchData(
+                                        enabled: true,
+                                        touchTooltipData: BarTouchTooltipData(
+                                          fitInsideVertically: true,
+                                          fitInsideHorizontally: true,
+                                          tooltipHorizontalOffset: 10,
+                                          getTooltipColor: (group) =>
+                                              const Color(0xFFFFFFFF),
+                                          getTooltipItem: (group, groupIndex,
+                                              rod, rodIndex) {
+                                            int getDaysInMonth(
+                                                int year, int month) {
+                                              if (month == DateTime.february) {
+                                                final bool isLeapYear =
+                                                    (year % 4 == 0) &&
+                                                            (year % 100 != 0) ||
+                                                        (year % 400 == 0);
+                                                return isLeapYear ? 29 : 28;
+                                              }
+                                              const List<int> daysInMonth =
+                                                  <int>[
+                                                31,
+                                                -1,
+                                                31,
+                                                30,
+                                                31,
+                                                30,
+                                                31,
+                                                31,
+                                                30,
+                                                31,
+                                                30,
+                                                31
+                                              ];
+                                              return daysInMonth[month - 1];
+                                            }
+
+                                            int lengthDate = getDaysInMonth(
+                                                DateTime.now().year,
+                                                DateTime.now().month);
+                                            List<String> dateList =
+                                                List.generate(
+                                                    lengthDate,
+                                                    (index) =>
+                                                        (index + 1).toString());
+                                            String formattedValue;
+                                            int value = rod.toY.toInt();
+                                            if (value >= 1000000000000) {
+                                              // Untuk triliunan
+                                              formattedValue =
+                                                  '${(value / 1000000000000).toStringAsFixed(1)} T';
+                                            } else if (value >= 1000000000) {
+                                              // Untuk miliaran
+                                              formattedValue =
+                                                  '${(value / 1000000000).toStringAsFixed(1)} M';
+                                            } else if (value >= 1000000) {
+                                              // Untuk jutaan
+                                              formattedValue =
+                                                  '${(value / 1000000).toStringAsFixed(1)} Jt';
+                                            } else if (value >= 1000) {
+                                              // Untuk ribuan
+                                              formattedValue =
+                                                  '${(value / 1000).toStringAsFixed(0)} Rb';
+                                            } else {
+                                              // Untuk angka di bawah ribuan
+                                              formattedValue =
+                                                  value.toStringAsFixed(0);
+                                            }
+
+                                            return BarTooltipItem(
+                                                formattedValue,
+                                                const TextStyle(
+                                                    color: Color(0xFF2E6CE9),
+                                                    fontSize: 10,
+                                                    fontWeight:
+                                                        FontWeight.w600),
+                                                children: [
+                                                  TextSpan(
+                                                      text:
+                                                          ' pada tanggal ${dateList[group.x - 1]}',
+                                                      style: const TextStyle(
+                                                          color: Color(
+                                                              0xFF848484)))
+                                                ]);
+                                          },
+                                        ),
+                                        touchCallback: (FlTouchEvent event,
+                                            barTouchResponse) {
+                                          if (event is FlTapUpEvent &&
+                                              barTouchResponse != null) {
+                                            setState(() {
+                                              if (touchedGroupIndex ==
+                                                  barTouchResponse.spot!
+                                                      .touchedBarGroupIndex) {
+                                                touchedGroupIndex = -1;
+                                              } else {
+                                                touchedGroupIndex =
+                                                    barTouchResponse.spot!
+                                                        .touchedBarGroupIndex;
+                                              }
+                                            });
+                                          }
+                                        },
+                                      ),
+                                      gridData: FlGridData(
+                                        drawVerticalLine: false,
+                                        drawHorizontalLine: true,
+                                        horizontalInterval: int.parse(
+                                                _chartData.first.maxSumbuX!) /
+                                            4,
+                                        getDrawingHorizontalLine: (value) {
+                                          return const FlLine(
+                                              strokeWidth: 1,
+                                              dashArray: [2, 4],
+                                              color: Color(0xFFB1B5C0));
+                                        },
+                                      ),
+                                      borderData: FlBorderData(show: false),
+                                      titlesData: FlTitlesData(
+                                        leftTitles: AxisTitles(
+                                            drawBelowEverything: false,
+                                            axisNameSize: 8,
+                                            sideTitles: SideTitles(
+                                              maxIncluded: false,
+                                              reservedSize: 35,
+                                              showTitles: true,
+                                              interval: int.parse(_chartData
+                                                      .first.maxSumbuX!) /
+                                                  4,
+                                              getTitlesWidget: (value, meta) {
+                                                String formattedValue;
+                                                if (value >= 1000000000000) {
+                                                  // Untuk triliunan
+                                                  formattedValue =
+                                                      '${(value / 1000000000000).toStringAsFixed(0)} T';
+                                                } else if (value >=
+                                                    1000000000) {
+                                                  // Untuk miliaran
+                                                  formattedValue =
+                                                      '${(value / 1000000000).toStringAsFixed(0)} M';
+                                                } else if (value >= 1000000) {
+                                                  // Untuk jutaan
+                                                  formattedValue =
+                                                      '${(value / 1000000).toStringAsFixed(0)} Jt';
+                                                } else if (value >= 1000) {
+                                                  // Untuk ribuan
+                                                  formattedValue =
+                                                      '${(value / 1000).toStringAsFixed(0)} Rb';
+                                                } else {
+                                                  // Untuk angka di bawah ribuan
+                                                  formattedValue =
+                                                      value.toStringAsFixed(0);
+                                                }
+
+                                                return Padding(
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                          right: 1),
+                                                  child: Text(
+                                                    formattedValue,
+                                                    style: const TextStyle(
+                                                      fontSize: 8,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Color(0xFF303030),
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            )),
+                                        topTitles: const AxisTitles(
+                                            sideTitles:
+                                                SideTitles(showTitles: false)),
+                                        rightTitles: const AxisTitles(
+                                            sideTitles:
+                                                SideTitles(showTitles: false)),
+                                        bottomTitles: AxisTitles(
+                                          sideTitles: SideTitles(
+                                            showTitles: true,
+                                            getTitlesWidget:
+                                                (double value, TitleMeta meta) {
+                                              int lengthDate = DateTime(
+                                                      DateTime.now().year,
+                                                      DateTime.now().month + 1,
+                                                      0)
+                                                  .day;
+
+                                              List<String> dates =
+                                                  List.generate(
+                                                      lengthDate,
+                                                      (index) => (index + 1)
+                                                          .toString());
+                                              int index = value.toInt() - 1;
+                                              if (index < 0 ||
+                                                  index >= dates.length) {
+                                                return const Text('');
+                                              }
+                                              return Text(
+                                                dates[index],
+                                                style: TextStyle(
+                                                    fontSize: 8,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: value.toInt() - 1 ==
+                                                            touchedGroupIndex
+                                                        ? const Color(
+                                                            0xFF303030)
+                                                        : const Color(
+                                                            0xFF717179)),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                      maxY: int.parse(
+                                              _chartData.first.maxSumbuX!) +
+                                          int.parse(
+                                                  _chartData.first.maxSumbuX!) *
+                                              0.05,
+                                      minY: 0,
+                                      barGroups: List.generate(
+                                        _chartData.length,
+                                        (index) => generateGroupData(
+                                          index + 1,
+                                          int.parse(
+                                              _chartData[index].total ?? '0'),
+                                          touchedGroupIndex == index,
+                                        ),
+                                      ))),
+                        ),
+                      )),
+                );
+              }
+            },
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
@@ -616,10 +939,10 @@ class _TransaksipageState extends State<Transaksipage> {
                                     value: item,
                                     child: Container(
                                       padding: const EdgeInsets.only(
-                                          left: 12,
-                                          right: 12,
-                                          bottom: 4,
-                                          top: 0),
+                                          left: 16,
+                                          right: 16,
+                                          bottom: 12,
+                                          top: 12),
                                       width: double.infinity,
                                       decoration: const BoxDecoration(
                                           border: Border(
@@ -629,9 +952,10 @@ class _TransaksipageState extends State<Transaksipage> {
                                       child: Text(
                                         item,
                                         style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: Color(0xFF576067)),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: Color(0xFF717179),
+                                        ),
                                       ),
                                     )))
                                 .toList(),
@@ -639,6 +963,8 @@ class _TransaksipageState extends State<Transaksipage> {
                             onChanged: (String? value) {
                               setState(() {
                                 selectedValue = value;
+                                bulan = months.indexOf(value!) + 1;
+                                _refreshData();
                               });
                             },
                             buttonStyleData: const ButtonStyleData(
@@ -647,11 +973,11 @@ class _TransaksipageState extends State<Transaksipage> {
                               width: 20,
                             ),
                             menuItemStyleData: const MenuItemStyleData(
-                              height: 30,
+                              height: 45,
                               padding: EdgeInsets.symmetric(horizontal: 0),
                             ),
                             dropdownStyleData: const DropdownStyleData(
-                                width: 90,
+                                width: 110,
                                 maxHeight: 200,
                                 offset: Offset(-5, -5),
                                 useSafeArea: true,
@@ -670,123 +996,212 @@ class _TransaksipageState extends State<Transaksipage> {
                     height: 15,
                   ),
                   SizedBox(
-                    height: 400,
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      itemCount: datatransaksi['data']?.length,
-                      padding: const EdgeInsets.only(bottom: 10),
-                      itemBuilder: (context, index) {
-                        String logoPembayaran = pembayaran(
-                            datatransaksi['data']?[index]["jenisPembayaran"]);
-                        bool last = index == datatransaksi['data']?.length;
-
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => Detailorder(
-                                    noOrder:
-                                        '${datatransaksi['data']?[index]["no"]}',
-                                    date:
-                                        '${datatransaksi['data']?[index]["time"]}',
-                                    jenisPembayaran: datatransaksi['data']
-                                        ?[index]["jenisPembayaran"],
-                                    iconjenisPembayaran: logoPembayaran,
-                                  ),
-                                ));
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            padding: const EdgeInsets.all(15),
-                            width: double.infinity,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFFFFFF),
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(10)),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.start,
+                      height: 400,
+                      child: FutureBuilder(
+                          future: _loadDataFuture,
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            } else if (snapshot.hasError) {
+                              return Container(
+                                  alignment: Alignment.center,
+                                  height: 375,
+                                  width: 375,
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
+                                    mainAxisSize: MainAxisSize.max,
                                     children: [
-                                      Container(
-                                        width: 41,
-                                        height: 41,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 11, horizontal: 10),
-                                        decoration: BoxDecoration(
-                                            borderRadius:
-                                                BorderRadius.circular(100),
-                                            color: const Color(0xFF2E6CE9)
-                                                .withOpacity(0.12)),
-                                        child: SvgPicture.asset(
-                                          logoPembayaran,
-                                          height: 20,
-                                          width: 20,
-                                        ),
+                                      SvgPicture.asset(
+                                        'asset/pegawai/Group 33979.svg',
+                                        width: 105,
+                                        height: 105,
                                       ),
                                       const SizedBox(
-                                        width: 10,
+                                        height: 12,
                                       ),
-                                      Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            '${datatransaksi['data']?[index]["no"]}',
-                                            style: const TextStyle(
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500,
-                                                color: Color(0xFF303030)),
-                                          ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            datatransaksi['data']?[index]
-                                                ["time"],
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
-                                                color: Color(0xFF717179)),
-                                          ),
-                                        ],
-                                      ),
+                                      const Text(
+                                        'Belum ada data barang tersedia',
+                                        style: TextStyle(
+                                            color: Color(0xFFB1B5C0),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500),
+                                      )
                                     ],
-                                  ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      numberFormat.format(datatransaksi['data']
-                                          ?[index]["amount"]),
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF2E6CE9)),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${datatransaksi['data']?[index]["items"]} item',
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                          color: Color(0xFF717179)),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+                                  ));
+                            } else {
+                              if (transaksiList.isEmpty) {
+                                return Container(
+                                    alignment: Alignment.center,
+                                    height: 375,
+                                    width: 375,
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.max,
+                                      children: [
+                                        SvgPicture.asset(
+                                          'asset/pegawai/Group 33979.svg',
+                                          width: 105,
+                                          height: 105,
+                                        ),
+                                        const SizedBox(
+                                          height: 12,
+                                        ),
+                                        const Text(
+                                          'Belum ada data barang tersedia',
+                                          style: TextStyle(
+                                              color: Color(0xFFB1B5C0),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500),
+                                        )
+                                      ],
+                                    ));
+                              } else {
+                                return ListView.builder(
+                                  controller: _scrollController,
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
+                                  itemCount: transaksiList.length,
+                                  padding: const EdgeInsets.only(bottom: 50),
+                                  itemBuilder: (context, index) {
+                                    String logoPembayaran = pembayaran(
+                                        transaksiList[index].tipeBayar ?? '');
+                                    String tanggalTransaksi =
+                                        DateFormat('MMM dd, yyyy hh:mm').format(
+                                            DateTime.parse(transaksiList[index]
+                                                    .createdAt ??
+                                                ''));
+                                    return GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                                builder: (context) =>
+                                                    Detailorder(
+                                                      transaksi:
+                                                          transaksiList[index],
+                                                      outlateName:
+                                                          transaksiList[index]
+                                                                  .outletName ??
+                                                              '',
+                                                      iconjenisPembayaran:
+                                                          logoPembayaran,
+                                                    )));
+                                      },
+                                      child: Container(
+                                        margin:
+                                            const EdgeInsets.only(bottom: 8),
+                                        padding: const EdgeInsets.all(15),
+                                        width: double.infinity,
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFFFFFFF),
+                                          borderRadius: BorderRadius.all(
+                                              Radius.circular(10)),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.start,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  Container(
+                                                    width: 41,
+                                                    height: 41,
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        vertical: 11,
+                                                        horizontal: 10),
+                                                    decoration: BoxDecoration(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(100),
+                                                        color: const Color(
+                                                                0xFF2E6CE9)
+                                                            .withOpacity(0.12)),
+                                                    child: SvgPicture.asset(
+                                                      logoPembayaran,
+                                                      height: 20,
+                                                      width: 20,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(
+                                                    width: 10,
+                                                  ),
+                                                  Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    children: [
+                                                      Text(
+                                                        '${transaksiList[index].penjualanId}',
+                                                        style: const TextStyle(
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            color: Color(
+                                                                0xFF303030)),
+                                                      ),
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        tanggalTransaksi,
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            color: Color(
+                                                                0xFF717179)),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  numberFormat.format(
+                                                      transaksiList[index]
+                                                          .total),
+                                                  style: const TextStyle(
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Color(0xFF2E6CE9)),
+                                                ),
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  '${transaksiList[index].detailtransaksi!.length} item',
+                                                  style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      color: Color(0xFF717179)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              }
+                            }
+                          })),
                   const SizedBox(
                     height: 100,
                   )

@@ -7,6 +7,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:salescheck/page/Login/loginform.dart';
 import 'package:salescheck/page/Signup/signupformklien.dart';
 
+import '../../component/customButtonPrimary.dart';
+import '../../component/inputTextField.dart';
+import '../../component/notifError.dart';
+import '../landingPage/landingPage.dart';
+
 class Signupform extends StatefulWidget {
   const Signupform({super.key});
 
@@ -18,24 +23,25 @@ class _SignupformState extends State<Signupform> {
   bool isSelectTab1 = true;
   bool isSelectTab2 = false;
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-  final TextEditingController numbercontroller = TextEditingController();
+  final TextEditingController emailcontroller = TextEditingController();
   final TextEditingController passwordcontroler = TextEditingController();
   String initialCountry = 'ID';
   String? countryCode;
-  bool focusnumber = false;
+  bool focusemail = false;
   bool focuspass = false;
   bool passSecure = true;
   bool rememberMe = false;
-  FocusNode _focusNodeNumber = FocusNode();
+  String role = 'Admin';
+  FocusNode _focusNodeemail = FocusNode();
   FocusNode _focusNodePass = FocusNode();
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    _focusNodeNumber.addListener(() {
+    _focusNodeemail.addListener(() {
       setState(() {
-        focusnumber = _focusNodeNumber.hasFocus;
+        focusemail = _focusNodeemail.hasFocus;
       });
     });
     _focusNodePass.addListener(() {
@@ -49,7 +55,7 @@ class _SignupformState extends State<Signupform> {
   void dispose() {
     // TODO: implement dispose
     super.dispose();
-    _focusNodeNumber.dispose();
+    _focusNodeemail.dispose();
     _focusNodePass.dispose();
     super.dispose();
   }
@@ -79,9 +85,11 @@ class _SignupformState extends State<Signupform> {
                       if (isSelectTab1 == true) {
                         isSelectTab1 = false;
                         isSelectTab2 = true;
+                        role = 'Manager';
                       } else if (isSelectTab1 == false) {
                         isSelectTab1 = true;
                         isSelectTab2 = false;
+                        role = 'Admin';
                       }
                     });
                   },
@@ -189,35 +197,10 @@ class _SignupformState extends State<Signupform> {
                           mainAxisAlignment: MainAxisAlignment.start,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                height: 39,
-                                width: 360,
-                                decoration: BoxDecoration(
-                                    color: const Color(0xFFF6F6F6),
-                                    borderRadius: BorderRadius.circular(10)),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  mainAxisSize: MainAxisSize.max,
-                                  children: [
-                                    TabButton(context, 'Klien', isSelectTab1),
-                                    const SizedBox(
-                                      width: 8,
-                                    ),
-                                    TabButton(context, 'Pegawai', isSelectTab2)
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(
-                              height: 24,
-                            ),
                             const Padding(
                               padding: EdgeInsets.only(bottom: 8),
                               child: Text(
-                                'No. Handphone',
+                                'Email',
                                 style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w500,
@@ -225,12 +208,9 @@ class _SignupformState extends State<Signupform> {
                               ),
                             ),
                             Container(
-                                // height: 72,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 0, vertical: 0),
                                 decoration: BoxDecoration(
                                     color: const Color(0xFFF6F6F6),
-                                    border: focusnumber
+                                    border: focusemail
                                         ? Border.all(
                                             width: 1,
                                             color: const Color(0xFF101010))
@@ -238,66 +218,11 @@ class _SignupformState extends State<Signupform> {
                                             width: 0,
                                             color: const Color(0xFFF6F6F6)),
                                     borderRadius: BorderRadius.circular(8)),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(0),
-                                      decoration: const BoxDecoration(
-                                          border: Border(
-                                              right: BorderSide(width: 0.1))),
-                                      child: Row(
-                                        children: [
-                                          CountryCodePicker(
-                                            onInit: (value) {
-                                              countryCode = value?.dialCode;
-                                            },
-                                            flagWidth: 16,
-                                            padding: const EdgeInsets.only(
-                                                right: 4,
-                                                left: 4,
-                                                top: 7,
-                                                bottom: 7),
-                                            showFlag: true,
-                                            showDropDownButton: true,
-                                            initialSelection: initialCountry,
-                                            textStyle: const TextStyle(
-                                                color: Color(0xff333333),
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500),
-                                            onChanged: (value) {
-                                              setState(() {
-                                                countryCode = value.dialCode;
-                                              });
-                                            },
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    Expanded(
-                                        child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16),
-                                      width: double.infinity,
-                                      child: TextField(
-                                        keyboardType: TextInputType.phone,
-                                        controller: numbercontroller,
-                                        focusNode: _focusNodeNumber,
-                                        style: const TextStyle(
-                                            color: Color(0xFF101010),
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 14),
-                                        decoration: const InputDecoration(
-                                            hintText: 'Nomor Telepon Anda',
-                                            hintStyle: TextStyle(
-                                                color: Color(0xFF979899),
-                                                fontWeight: FontWeight.w500,
-                                                fontSize: 14),
-                                            border: InputBorder.none),
-                                      ),
-                                    ))
-                                  ],
+                                child: Inputtextfield(
+                                  keyboardType: TextInputType.emailAddress,
+                                  controller: emailcontroller,
+                                  focus: _focusNodeemail,
+                                  hintText: 'Nomor Email Anda',
                                 )),
                             Padding(
                               padding:
@@ -355,28 +280,15 @@ class _SignupformState extends State<Signupform> {
                                   children: [
                                     Expanded(
                                       child: Container(
-                                        alignment: Alignment.center,
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 16),
-                                        child: TextField(
-                                          keyboardType: TextInputType.text,
-                                          controller: passwordcontroler,
-                                          focusNode: _focusNodePass,
-                                          obscureText: passSecure,
-                                          obscuringCharacter: '*',
-                                          style: const TextStyle(
-                                              color: Color(0xFF101010),
-                                              fontWeight: FontWeight.w500,
-                                              fontSize: 14),
-                                          decoration: const InputDecoration(
-                                              hintText: 'Tulis Password',
-                                              hintStyle: const TextStyle(
-                                                  color: Color(0xFF979899),
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 14),
-                                              border: InputBorder.none),
-                                        ),
-                                      ),
+                                          alignment: Alignment.center,
+                                          padding:
+                                              const EdgeInsets.only(right: 16),
+                                          child: Inputtextfield(
+                                            controller: passwordcontroler,
+                                            focus: _focusNodePass,
+                                            password: passSecure,
+                                            keyboardType: TextInputType.text,
+                                          )),
                                     ),
                                     IconButton(
                                         onPressed: () {
@@ -398,26 +310,26 @@ class _SignupformState extends State<Signupform> {
                             const SizedBox(
                               height: 16,
                             ),
-                            ElevatedButton(
+                            customButtonPrimary(
+                                height: 50,
+                                width: double.infinity,
+                                alignment: Alignment.center,
                                 onPressed: () {
-                                  String nomerhp =
-                                      countryCode! + numbercontroller.text;
-                                  print(nomerhp);
-                                  Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) =>
-                                              const Signupformklien()));
+                                  if (emailcontroller.text.isNotEmpty &&
+                                      passwordcontroler.text.isNotEmpty) {
+                                    Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (context) =>
+                                                Signupformklien(
+                                                    email: emailcontroller.text,
+                                                    password:
+                                                        passwordcontroler.text,
+                                                    role: role)));
+                                  } else {}
                                 },
-                                style: ElevatedButton.styleFrom(
-                                    shape: const RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(12))),
-                                    backgroundColor: const Color(0xFF0747CB),
-                                    minimumSize:
-                                        const Size(double.infinity, 50)),
                                 child: const Text(
-                                  'Buat Akun',
+                                  'Masuk',
                                   style: TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
@@ -444,12 +356,11 @@ class _SignupformState extends State<Signupform> {
                                         ),
                                         recognizer: TapGestureRecognizer()
                                           ..onTap = () {
-                                            print("Teken");
                                             Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
                                                     builder: (context) =>
-                                                        const Signupform()));
+                                                        const Loginform()));
                                           })
                                   ])),
                             )

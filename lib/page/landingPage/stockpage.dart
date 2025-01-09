@@ -5,367 +5,158 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:salescheck/Model/product.dart';
+import 'package:salescheck/Service/ApiProduct.dart';
 import 'package:salescheck/component/searchBar.dart';
 import 'package:salescheck/page/Barang/addBarang.dart';
 import 'package:salescheck/page/Barang/addCategory.dart';
 import 'package:salescheck/page/Barang/editBarang.dart';
 import 'package:salescheck/page/Barang/editCategory.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:toastification/toastification.dart';
 
+import '../../Model/category.dart';
+import '../../Service/ApiCategory.dart';
+import '../../component/notifSucces.dart';
+
 class Stockpage extends StatefulWidget {
-  const Stockpage({super.key});
+  final String? selectedOutlet;
+  final int? ouletidTransaksi;
+  const Stockpage({super.key, this.selectedOutlet, this.ouletidTransaksi});
 
   @override
   State<Stockpage> createState() => _StockpageState();
 }
 
 class _StockpageState extends State<Stockpage> {
+  final Apicategory _api = new Apicategory();
+  final Apiproduct _apiProduct = new Apiproduct();
+  int id_Outlet = 0;
+  List<Category> categoryOption = [];
+  List<Product> productList = [];
+  List<Product> productListFilter = [];
   TextEditingController search = new TextEditingController();
   final ScrollController _scrollController = new ScrollController();
+  final FocusNode _focusNodeemail = FocusNode();
+  bool focusemail = false;
   final numberFormat =
       NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
   // Kategori yang dipilih
-  Map<String, bool> selectedCategories = {};
-  Map<String, bool> selectedProducts = {};
-  Map<String, int> quantityProduct = {};
-  List<Map<String, dynamic>> displayedProducts = [];
+
   String searchQuery = '';
   int totalAmount = 0;
   int totalBarang = 0;
   List<String> searchBarang = [];
   List<int> searchstock = [];
   List<int> searchnominal = [];
-  Map<String, List<Map<String, dynamic>>> product = {
-    'Bola Olahraga': [
-      {
-        'name': 'Baju Polos',
-        'price': 100000,
-        'stock': 50,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Baju Batik',
-        'price': 150000,
-        'stock': 30,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Baju Kemeja',
-        'price': 200000,
-        'stock': 20,
-        'quantity': 0,
-        'active': false
-      },
-      {
-        'name': 'Baju Muslim',
-        'price': 175000,
-        'stock': 25,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Baju Kaos',
-        'price': 85000,
-        'stock': 60,
-        'quantity': 0,
-        'active': true
-      }
-    ],
-    'Kaos': [
-      {
-        'name': 'Kaos Polos',
-        'price': 80000,
-        'stock': 40,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Kaos Lengan Panjang',
-        'price': 90000,
-        'stock': 35,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Kaos Band',
-        'price': 95000,
-        'stock': 50,
-        'quantity': 0,
-        'active': false
-      },
-      {
-        'name': 'Kaos Raglan',
-        'price': 75000,
-        'stock': 45,
-        'quantity': 0,
-        'active': true
-      }
-    ],
-    'Celana': [
-      {
-        'name': 'Celana Jeans',
-        'price': 120000,
-        'stock': 25,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Celana Pendek',
-        'price': 70000,
-        'stock': 60,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Celana Chino',
-        'price': 130000,
-        'stock': 30,
-        'quantity': 0,
-        'active': false
-      },
-      {
-        'name': 'Celana Kargo',
-        'price': 140000,
-        'stock': 20,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Celana Bahan',
-        'price': 110000,
-        'stock': 40,
-        'quantity': 0,
-        'active': true
-      }
-    ],
-    'Sepatu': [
-      {
-        'name': 'Sepatu Sneakers',
-        'price': 250000,
-        'stock': 15,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Sepatu Boots',
-        'price': 300000,
-        'stock': 10,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Sepatu Lari',
-        'price': 220000,
-        'stock': 20,
-        'quantity': 0,
-        'active': false
-      },
-      {
-        'name': 'Sepatu Formal',
-        'price': 320000,
-        'stock': 12,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Sepatu Futsal',
-        'price': 180000,
-        'stock': 25,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Sepatu Sandal',
-        'price': 100000,
-        'stock': 50,
-        'quantity': 0,
-        'active': false
-      }
-    ],
-    'Sandal': [
-      {
-        'name': 'Sandal Jepit',
-        'price': 50000,
-        'stock': 70,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Sandal Gunung',
-        'price': 85000,
-        'stock': 40,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Sandal Kulit',
-        'price': 150000,
-        'stock': 25,
-        'quantity': 0,
-        'active': false
-      },
-      {
-        'name': 'Sandal Selop',
-        'price': 60000,
-        'stock': 60,
-        'quantity': 0,
-        'active': true
-      }
-    ],
-    'Jaket': [
-      {
-        'name': 'Jaket Kulit',
-        'price': 350000,
-        'stock': 10,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Jaket Denim',
-        'price': 250000,
-        'stock': 20,
-        'quantity': 0,
-        'active': true
-      },
-      {
-        'name': 'Jaket Bomber',
-        'price': 300000,
-        'stock': 15,
-        'quantity': 0,
-        'active': false
-      },
-      {
-        'name': 'Jaket Parasut',
-        'price': 200000,
-        'stock': 25,
-        'quantity': 0,
-        'active': true
-      }
-    ],
-    'Topi': [],
-  };
+
+  Future<void> _readAndPrintCategoryData() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final int idOutlet = await prefs.getInt('id_outlet') ?? 0;
+
+    // Ambil kategori dari API
+    categoryOption = await _api.getCategory();
+
+    if (_api.statusCode == 200) {
+      // Pastikan data kategori tidak kosong
+
+      if (categoryOption.isNotEmpty) {
+        setState(() {
+          // Simpan kategori yang diterima ke dalam `categoryOption`
+          categoryOption = categoryOption;
+        });
+
+        // Untuk setiap kategori, ambil produk terkait
+        for (var i = 0; i < categoryOption.length; i++) {
+          await _readAndPrintProductData(categoryOption[i].idKategori ?? 0);
+        }
+      } else {}
+    } else {}
+  }
+
+  Future<void> _readAndPrintProductData(int categoryId) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final int idOutlet;
+    if (widget.ouletidTransaksi != null) {
+      idOutlet = widget.ouletidTransaksi!;
+    } else {
+      idOutlet = prefs.getInt('id_outlet') ?? 0;
+    }
+
+    // Ambil produk berdasarkan outlet dan kategori
+    productList = await _apiProduct.getProductsByOutletAndCategory(
+      outletId: idOutlet,
+      categoryId: categoryId,
+    );
+
+    if (_apiProduct.statusCode == 200) {
+      setState(() {
+        // Perbarui daftar produk
+        productList.sort((a, b) {
+          String statusA = a.status ?? "Produk Tidak Aktif";
+          String statusB = b.status ?? "Produk Tidak Aktif";
+
+          if (statusA != statusB) {
+            return statusA == "Produk Aktif" ? -1 : 1;
+          }
+          String nameA = a.productName?.toLowerCase() ?? "";
+          String nameB = b.productName?.toLowerCase() ?? "";
+
+          return nameA.compareTo(nameB);
+        });
+        productListFilter = productList
+            .where(
+                (product) => product.detailOutlets!.first.outletsId == idOutlet)
+            .toList();
+
+        id_Outlet = idOutlet;
+      });
+    } else {}
+  }
 
   @override
   void initState() {
     super.initState();
-    // Inisialisasi semua kategori dengan status tidak dipilih (false)
-    selectedCategories['Semua'] = true;
-    sortProductsByActive();
-    product.forEach((category, products) {
-      selectedCategories[category] = false;
-      products.forEach((prod) {
-        selectedProducts[prod['name']] = false;
-      });
-    });
-    _showAllProducts();
-    totalBarang = _getTotalItems();
-  }
 
-  // Function untuk menghitung total barang dari semua kategori
-  int _getTotalItems() {
-    int total = 0;
-    product.forEach((category, items) {
-      print(items.length);
-      total += items.length; // Tambahkan jumlah item di setiap kategori
-    });
-    return total;
-  }
-
-  // Tampilkan semua produk dari semua kategori
-  void _showAllProducts() {
-    displayedProducts = [];
-    product.forEach((category, products) {
-      displayedProducts.addAll(products);
-    });
-  }
-
-  //Method Mengurutkan Nama
-  void sortProductsByActive() {
-    product.forEach((key, productList) {
-      productList.sort((a, b) {
-        // Produk dengan 'active: true' akan muncul sebelum 'active: false'
-        if (a['active'] == b['active']) return 0;
-        return a['active'] ? -1 : 1;
+    _readAndPrintCategoryData();
+    _focusNodeemail.addListener(() {
+      setState(() {
+        if (!_focusNodeemail.hasFocus) {
+          FocusScope.of(context).unfocus();
+        }
       });
     });
   }
 
-  // Function untuk menghitung total barang dalam satu kategori
-  int _getTotalItemsInCategory(String category) {
-    if (product.containsKey(category)) {
-      return product[category]!.length; // Kembalikan jumlah item di kategori
-    }
-    return 0; // Jika kategori tidak ditemukan
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    _focusNodeemail.dispose();
+    super.dispose();
   }
 
   // Function untuk menampilkan produk berdasarkan kategori dan query pencarian
-  List<Map<String, dynamic>> _getFilteredProducts() {
-    List<Map<String, dynamic>> filteredProducts = [];
-
-    // Cek apakah kategori "Semua" dipilih
-    if (selectedCategories['Semua'] == true) {
-      // Jika "Semua" dipilih, tampilkan semua produk
-      product.forEach((category, products) {
-        filteredProducts.addAll(products);
-      });
-    } else if (selectedCategories.values.every((isSelected) => !isSelected)) {
-      // Jika tidak ada kategori yang dipilih, tampilkan semua produk
-      product.forEach((category, products) {
-        filteredProducts.addAll(products);
-      });
-    } else {
-      // Jika ada kategori yang dipilih selain "Semua"
-      selectedCategories.forEach((category, isSelected) {
-        if (isSelected && category != 'Semua') {
-          filteredProducts.addAll(product[category]!);
-        }
-      });
-    }
-
+  List<Product> _getFilteredProducts() {
     // Filter berdasarkan kata kunci pencarian jika ada
+    productListFilter = productList;
     if (searchQuery.isNotEmpty) {
-      filteredProducts = filteredProducts
+      productListFilter = productListFilter
           .where((product) =>
-              product['name'].toLowerCase().contains(searchQuery.toLowerCase()))
+              product.productName!
+                  .toLowerCase()
+                  .startsWith(searchQuery.toLowerCase()) &&
+              product.detailOutlets!.first.outletsId == id_Outlet)
           .toList();
     }
 
-    return filteredProducts;
-  }
-
-//Mendapatkan jumlah stock
-  int getQuantity(String productName) {
-    return quantityProduct[productName] ?? 0;
-  }
-
-// Menambah jumlah barang (dengan batas maksimal stok)
-  void incrementQuantity(Map<String, dynamic> product) {
-    setState(() {
-      if (getQuantity(product['name']) < product['stock']) {
-        quantityProduct[product['name']] =
-            (quantityProduct[product['name']] ?? 0) + 1;
-      }
-    });
-  }
-
-  // Mengurangi jumlah barang (jika 0, hapus dari daftar terpilih)
-  void decrementQuantity(Map<String, dynamic> product) {
-    setState(() {
-      if (getQuantity(product['name']) > 1) {
-        quantityProduct[product['name']] =
-            quantityProduct[product['name']]! - 1;
-      } else {
-        quantityProduct.remove(product['name']);
-        selectedProducts[product['name']] = false; // Hapus status selected
-      }
-    });
+    return productListFilter;
   }
 
   void notif(String title) {
     toastification.show(
-        margin: const EdgeInsets.only(right: 15),
+        alignment: Alignment.topCenter,
+        margin: const EdgeInsets.only(right: 16, left: 16),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         autoCloseDuration: const Duration(seconds: 8),
         progressBarTheme: const ProgressIndicatorThemeData(
@@ -413,8 +204,14 @@ class _StockpageState extends State<Stockpage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Container(
+                width: 50,
+                height: 4,
+                color: const Color(0xFFE9E9E9),
+                margin: const EdgeInsets.only(bottom: 16),
+              ),
               GestureDetector(
                 onTap: () async {
                   Navigator.pop(context);
@@ -424,6 +221,7 @@ class _StockpageState extends State<Stockpage> {
                           builder: (context) => const Addcategory()));
                   if (result != null) {
                     notif(result);
+                    _refreshData();
                   }
                 },
                 child: Container(
@@ -450,6 +248,7 @@ class _StockpageState extends State<Stockpage> {
                           ),
                           Text(
                             'Gunakan untuk mengelompokan barang.',
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -485,6 +284,7 @@ class _StockpageState extends State<Stockpage> {
                           builder: (context) => const Addbarang()));
                   if (result != null) {
                     notif(result);
+                    _refreshData();
                   }
                 },
                 child: Container(
@@ -510,6 +310,7 @@ class _StockpageState extends State<Stockpage> {
                           ),
                           Text(
                             'Tambahkan barang sesuai kategori yang telah dibuat.',
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
@@ -542,22 +343,26 @@ class _StockpageState extends State<Stockpage> {
 
   void _showQuickAction(
       BuildContext context,
+      int id,
+      int idOutlet,
       String namaBarang,
       int harga,
       String deskripsi,
+      int relasiCategory,
       String category,
       bool status,
       int Stock,
-      String imageUrl) {
+      bool stokcTakTerbatas,
+      String imageUrl,
+      int imageRealsi) {
     final TextEditingController stockValue = TextEditingController();
-    int stockModal;
+    int? stockModal = Stock;
     stockValue.text = Stock.toString();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: const Color(0xFFFDFEFE),
       builder: (BuildContext context) {
-        bool stokcTakTerbatas = false;
         bool statusActive = status;
         return StatefulBuilder(
           builder: (context, StateSetter setModalState) {
@@ -572,8 +377,14 @@ class _StockpageState extends State<Stockpage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const SizedBox(
-                    height: 16,
+                  Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: 50,
+                      height: 4,
+                      color: const Color(0xFFE9E9E9),
+                      margin: const EdgeInsets.only(bottom: 16),
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.all(8),
@@ -615,15 +426,28 @@ class _StockpageState extends State<Stockpage> {
                             height: 140,
                             padding: EdgeInsets.zero,
                             decoration: BoxDecoration(
-                                color: Colors.blue,
+                                color: Colors.transparent,
                                 borderRadius: BorderRadius.circular(10)),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(10),
-                              child: Image.asset(
-                                'asset/barang/Rectangle 894.png',
+                              child: CachedNetworkImage(
                                 fit: BoxFit.cover,
                                 width: 140,
                                 height: 140,
+                                imageUrl: _apiProduct.getImage(imageUrl),
+                                progressIndicatorBuilder:
+                                    (context, url, progress) {
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value: progress.totalSize != null
+                                          ? progress.downloaded /
+                                              (progress.totalSize ?? 1)
+                                          : null,
+                                    ),
+                                  );
+                                },
+                                errorWidget: (context, url, error) =>
+                                    const Icon(Icons.error),
                               ),
                             )),
                         const SizedBox(
@@ -646,9 +470,9 @@ class _StockpageState extends State<Stockpage> {
                               const SizedBox(
                                 height: 4,
                               ),
-                              const Text(
-                                'Bola berwarna hijau untuk berman tenis',
-                                style: TextStyle(
+                              Text(
+                                deskripsi,
+                                style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
                                     color: Color(0xFF9399A7)),
@@ -683,23 +507,29 @@ class _StockpageState extends State<Stockpage> {
                                                     category: category,
                                                     harga: harga,
                                                     imageUrl: imageUrl,
+                                                    unlimitedStock:
+                                                        stokcTakTerbatas,
+                                                    idOutlet: idOutlet,
+                                                    idProduct: id,
+                                                    stock: Stock,
+                                                    categoryRelasi:
+                                                        relasiCategory,
+                                                    imageRelasi: imageRealsi,
                                                   )));
                                       if (result != null) {
                                         final message = result['message'];
                                         final isDeleted = result['isDeleted'];
                                         // ignore: use_build_context_synchronously
                                         Navigator.pop(context);
-                                        print(message);
-                                        print(isDeleted);
+
                                         if (isDeleted == true) {
                                           setState(() {
                                             //delete item
-                                            product[category]?.removeWhere(
-                                                (item) =>
-                                                    item['name'] == namaBarang);
+                                            _refreshData();
                                           });
                                           notif(message);
                                         } else {
+                                          _refreshData();
                                           notif(message);
                                         }
                                       }
@@ -750,8 +580,6 @@ class _StockpageState extends State<Stockpage> {
                             thumbColor: const Color(0xFFFFFFFF),
                             value: statusActive,
                             onChanged: (value) {
-                              print('tekan');
-                              print(value);
                               setModalState(() {
                                 statusActive = value;
                               });
@@ -843,7 +671,7 @@ class _StockpageState extends State<Stockpage> {
                                         onPressed: () {
                                           stockModal =
                                               int.parse(stockValue.text);
-                                          if (stockModal > 0) {
+                                          if (stockModal! > 0) {
                                             setModalState(() {
                                               stockModal =
                                                   (stockModal ?? 0) - 1;
@@ -867,6 +695,12 @@ class _StockpageState extends State<Stockpage> {
                                           textAlign: TextAlign.center,
                                           keyboardType: TextInputType.number,
                                           controller: stockValue,
+                                          onChanged: (value) {
+                                            setModalState(() {
+                                              stockValue.text = value;
+                                              stockModal = int.parse(value);
+                                            });
+                                          },
                                           maxLength: 3,
                                           validator: (value) {
                                             if (value == null ||
@@ -925,9 +759,19 @@ class _StockpageState extends State<Stockpage> {
                     padding:
                         const EdgeInsets.symmetric(vertical: 10, horizontal: 0),
                     child: ElevatedButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          notif('Stok $namaBarang berhasil diedit');
+                        onPressed: () async {
+                          await _apiProduct.quickeditProductApi(
+                              productId: id,
+                              nama: namaBarang,
+                              stock: stockModal,
+                              unlimitedStock: stokcTakTerbatas,
+                              status: statusActive);
+                          if (_apiProduct.statusCode == 200 ||
+                              _apiProduct.statusCode == 201) {
+                            Navigator.pop(context);
+                            notif('Stok $namaBarang berhasil diedit');
+                            _refreshData();
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                             shape: const RoundedRectangleBorder(
@@ -955,220 +799,14 @@ class _StockpageState extends State<Stockpage> {
   Future<void> _refreshData() async {
     // Simulasi delay untuk menunggu data baru
     await Future.delayed(const Duration(seconds: 2));
-    product.clear();
+    productList.clear();
+    categoryOption.clear();
+    productListFilter.clear();
+    search.clear;
+    searchQuery = '';
     // Perbarui data dan setState untuk memperbarui tampilan
     setState(() {
-      product = {
-        'Bola Olahraga': [
-          {
-            'name': 'Baju Polos',
-            'price': 100000,
-            'stock': 50,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Baju Batik',
-            'price': 150000,
-            'stock': 30,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Baju Kemeja',
-            'price': 200000,
-            'stock': 20,
-            'quantity': 0,
-            'active': false
-          },
-          {
-            'name': 'Baju Muslim',
-            'price': 175000,
-            'stock': 25,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Baju Kaos',
-            'price': 85000,
-            'stock': 60,
-            'quantity': 0,
-            'active': true
-          }
-        ],
-        'Kaos': [
-          {
-            'name': 'Kaos Polos',
-            'price': 80000,
-            'stock': 40,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Kaos Lengan Panjang',
-            'price': 90000,
-            'stock': 35,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Kaos Band',
-            'price': 95000,
-            'stock': 50,
-            'quantity': 0,
-            'active': false
-          },
-          {
-            'name': 'Kaos Raglan',
-            'price': 75000,
-            'stock': 45,
-            'quantity': 0,
-            'active': true
-          }
-        ],
-        'Celana': [
-          {
-            'name': 'Celana Jeans',
-            'price': 120000,
-            'stock': 25,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Celana Pendek',
-            'price': 70000,
-            'stock': 60,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Celana Chino',
-            'price': 130000,
-            'stock': 30,
-            'quantity': 0,
-            'active': false
-          },
-          {
-            'name': 'Celana Kargo',
-            'price': 140000,
-            'stock': 20,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Celana Bahan',
-            'price': 110000,
-            'stock': 40,
-            'quantity': 0,
-            'active': true
-          }
-        ],
-        'Sepatu': [
-          {
-            'name': 'Sepatu Sneakers',
-            'price': 250000,
-            'stock': 15,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Sepatu Boots',
-            'price': 300000,
-            'stock': 10,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Sepatu Lari',
-            'price': 220000,
-            'stock': 20,
-            'quantity': 0,
-            'active': false
-          },
-          {
-            'name': 'Sepatu Formal',
-            'price': 320000,
-            'stock': 12,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Sepatu Futsal',
-            'price': 180000,
-            'stock': 25,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Sepatu Sandal',
-            'price': 100000,
-            'stock': 50,
-            'quantity': 0,
-            'active': false
-          }
-        ],
-        'Sandal': [
-          {
-            'name': 'Sandal Jepit',
-            'price': 50000,
-            'stock': 70,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Sandal Gunung',
-            'price': 85000,
-            'stock': 40,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Sandal Kulit',
-            'price': 150000,
-            'stock': 25,
-            'quantity': 0,
-            'active': false
-          },
-          {
-            'name': 'Sandal Selop',
-            'price': 60000,
-            'stock': 60,
-            'quantity': 0,
-            'active': true
-          }
-        ],
-        'Jaket': [
-          {
-            'name': 'Jaket Kulit',
-            'price': 350000,
-            'stock': 10,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Jaket Denim',
-            'price': 250000,
-            'stock': 20,
-            'quantity': 0,
-            'active': true
-          },
-          {
-            'name': 'Jaket Bomber',
-            'price': 300000,
-            'stock': 15,
-            'quantity': 0,
-            'active': false
-          },
-          {
-            'name': 'Jaket Parasut',
-            'price': 200000,
-            'stock': 25,
-            'quantity': 0,
-            'active': true
-          }
-        ],
-        'Topi': [],
-      };
+      _readAndPrintCategoryData();
     });
   }
 
@@ -1202,9 +840,11 @@ class _StockpageState extends State<Stockpage> {
                     ),
                     Searchbar(
                         hintText: 'Cari Barang',
+                        focus: _focusNodeemail,
                         onChanged: (p0) {
                           setState(() {
                             searchQuery = search.text;
+                            _getFilteredProducts();
                           });
                         },
                         controller: search)
@@ -1218,393 +858,816 @@ class _StockpageState extends State<Stockpage> {
                   child: SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       controller: _scrollController,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        children: [
-                          ListView.builder(
-                            padding: const EdgeInsets.symmetric(
-                                vertical: 10, horizontal: 16),
-                            itemCount: product.keys.length,
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemBuilder: (context, index) {
-                              String category = product.keys.elementAt(index);
-                              List<Map<String, dynamic>> productsInCategory =
-                                  _getFilteredProducts().where((prod) {
-                                // Filter produk yang hanya sesuai dengan kategori saat ini
-                                return product[category]!.contains(prod);
-                              }).toList();
-
-                              List<Map<String, dynamic>> products =
-                                  product[category]!;
-                              int totalbarang =
-                                  _getTotalItemsInCategory(category);
-                              return ExpansionTile(
-                                tilePadding: EdgeInsets.zero,
-                                shape: const Border(),
-                                title: SizedBox(
-                                  width: double.infinity,
-                                  child: Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.start,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            category,
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 16,
-                                                color: Color(0xFF303030)),
-                                          ),
-                                          const SizedBox(
-                                            height: 4,
-                                          ),
-                                          Container(
-                                            width: 80,
-                                            height: 17,
-                                            alignment: Alignment.centerLeft,
-                                            child: TextButton(
-                                              style: TextButton.styleFrom(
-                                                  padding: EdgeInsets.zero),
-                                              onPressed: () async {
-                                                final result =
-                                                    await Navigator.push(
-                                                        context,
-                                                        MaterialPageRoute(
-                                                            builder: (context) =>
-                                                                Editcategory(
-                                                                  category:
-                                                                      category,
-                                                                )));
-                                                if (result.isNotEmpty) {
-                                                  notif(result);
-                                                }
-                                              },
-                                              child: const Text(
-                                                'Edit Kategori',
-                                                style: TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    fontSize: 12,
-                                                    color: Color(0xFF2E6CE9)),
-                                              ),
-                                            ),
-                                          )
-                                        ],
-                                      ),
-                                      Text(
-                                        '$totalbarang Products',
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 12,
-                                            color: Color(0xFF717179)),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                children: [
-                                  totalbarang == 0
-                                      ? Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          children: [
-                                            const Divider(
-                                              thickness: 1,
-                                              color: Color(0xFFEEEEEE),
-                                            ),
-                                            Container(
-                                              width: double.infinity,
-                                              padding: const EdgeInsets.only(
-                                                  right: 8, bottom: 16),
-                                              child: const Text(
-                                                'Belum ada barang yang ditambahkan',
-                                                style: TextStyle(
-                                                    color: Color(0xFFB1B5C0),
-                                                    fontWeight: FontWeight.w400,
-                                                    fontSize: 14),
-                                              ),
-                                            )
-                                          ],
+                      child: Container(
+                        color: Colors.transparent,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.max,
+                          children: [
+                            categoryOption.isEmpty
+                                ? Container(
+                                    alignment: Alignment.center,
+                                    height: 375,
+                                    width: 375,
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.center,
+                                      mainAxisSize: MainAxisSize.max,
+                                      children: [
+                                        SvgPicture.asset(
+                                          'asset/pegawai/Group 33979.svg',
+                                          width: 105,
+                                          height: 105,
+                                        ),
+                                        const SizedBox(
+                                          height: 12,
+                                        ),
+                                        const Text(
+                                          'Belum ada data kategori tersedia',
+                                          style: TextStyle(
+                                              color: Color(0xFFB1B5C0),
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500),
                                         )
-                                      : ListView.builder(
-                                          shrinkWrap: true,
-                                          physics:
-                                              const NeverScrollableScrollPhysics(),
-                                          itemCount: productsInCategory.length,
-                                          itemBuilder: (context, index) {
-                                            Map<String, dynamic>? prod =
-                                                productsInCategory[index];
+                                      ],
+                                    ))
+                                : searchQuery.isEmpty || searchQuery.length < 1
+                                    ? ListView.builder(
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10, horizontal: 16),
+                                        itemCount: categoryOption.length,
+                                        shrinkWrap: true,
+                                        physics:
+                                            const NeverScrollableScrollPhysics(),
+                                        itemBuilder: (context, index) {
+                                          List<Product> newproductList =
+                                              productListFilter
+                                                  .where((product) =>
+                                                      product
+                                                              .detailCategories!
+                                                              .first
+                                                              .categoriesId !=
+                                                          null &&
+                                                      categoryOption[index]
+                                                              .idKategori !=
+                                                          null &&
+                                                      product
+                                                              .detailCategories!
+                                                              .first
+                                                              .categoriesId ==
+                                                          categoryOption[index]
+                                                              .idKategori &&
+                                                      product
+                                                              .detailOutlets!
+                                                              .first
+                                                              .outletsId ==
+                                                          id_Outlet)
+                                                  .toList();
 
-                                            String harga = numberFormat.format(
-                                                int.parse(
-                                                    prod['price'].toString()));
-                                            bool status = prod['active'];
-                                            bool isSelected = selectedProducts[
-                                                    prod['name']] ??
-                                                false;
-                                            return Column(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.start,
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              children: [
-                                                GestureDetector(
-                                                  onTap: () {
-                                                    String deskripsi =
-                                                        'Bola ini hijau';
-                                                    String imageUrl =
-                                                        'Bola ini hijau';
-                                                    _showQuickAction(
-                                                        context,
-                                                        prod['name'],
-                                                        int.parse(
-                                                            harga.replaceAll(
-                                                                RegExp(
-                                                                    r'[^\d]'),
-                                                                '')),
-                                                        deskripsi,
-                                                        category,
-                                                        status,
-                                                        prod['stock'],
-                                                        imageUrl);
-                                                  },
-                                                  child: Container(
-                                                    width: double.infinity,
-                                                    decoration: BoxDecoration(
-                                                      color: status
-                                                          ? (isSelected
-                                                              ? const Color(
-                                                                  0xFF2E6CE9)
-                                                              : const Color(
-                                                                  0xFFFFFFFF))
-                                                          : const Color(
-                                                              0xFFEEEEEE),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                              10),
-                                                    ),
-                                                    padding: const EdgeInsets
-                                                        .symmetric(
-                                                        vertical: 8,
-                                                        horizontal: 16),
-                                                    child: Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .spaceBetween,
-                                                      children: [
-                                                        Container(
-                                                          child: Row(
-                                                            mainAxisAlignment:
-                                                                MainAxisAlignment
-                                                                    .start,
-                                                            children: [
-                                                              Container(
-                                                                  width: 50,
-                                                                  height: 52,
+                                          return ExpansionTile(
+                                            tilePadding: EdgeInsets.zero,
+                                            shape: const Border(),
+                                            initiallyExpanded: true,
+                                            title: SizedBox(
+                                              width: double.infinity,
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment.start,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .start,
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Text(
+                                                        categoryOption[index]
+                                                                .namaKategori ??
+                                                            'Test',
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            fontSize: 16,
+                                                            color: Color(
+                                                                0xFF303030)),
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 4,
+                                                      ),
+                                                      Container(
+                                                        width: 80,
+                                                        height: 17,
+                                                        alignment: Alignment
+                                                            .centerLeft,
+                                                        child: TextButton(
+                                                          style: TextButton
+                                                              .styleFrom(
                                                                   padding:
                                                                       EdgeInsets
-                                                                          .zero,
-                                                                  decoration: BoxDecoration(
-                                                                      color: Colors
-                                                                          .blue,
-                                                                      borderRadius:
-                                                                          BorderRadius.circular(
-                                                                              10)),
-                                                                  child:
-                                                                      ClipRRect(
-                                                                    borderRadius:
-                                                                        BorderRadius.circular(
-                                                                            10),
-                                                                    child: Image
-                                                                        .asset(
-                                                                      'asset/barang/Rectangle 894.png',
-                                                                      fit: BoxFit
-                                                                          .cover,
-                                                                      width: 50,
-                                                                      height:
-                                                                          52,
-                                                                    ),
-                                                                  )),
-                                                              const SizedBox(
-                                                                width: 16,
-                                                              ),
-                                                              Container(
-                                                                child: Column(
+                                                                          .zero),
+                                                          onPressed: () async {
+                                                            final result =
+                                                                await Navigator.push(
+                                                                    context,
+                                                                    MaterialPageRoute(
+                                                                        builder: (context) => Editcategory(
+                                                                              category: categoryOption[index].namaKategori ?? 'Test',
+                                                                              idCategory: categoryOption[index].idKategori ?? 0,
+                                                                              jumlahBarang: categoryOption[index].jumlahProduct ?? 0,
+                                                                            )));
+                                                            if (result
+                                                                .isNotEmpty) {
+                                                              notif(result);
+                                                              _refreshData();
+                                                            }
+                                                          },
+                                                          child: const Text(
+                                                            'Edit Kategori',
+                                                            style: TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w500,
+                                                                fontSize: 12,
+                                                                color: Color(
+                                                                    0xFF2E6CE9)),
+                                                          ),
+                                                        ),
+                                                      )
+                                                    ],
+                                                  ),
+                                                  Text(
+                                                    '${newproductList.length} Products',
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        fontSize: 12,
+                                                        color:
+                                                            Color(0xFF717179)),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            children: [
+                                              newproductList.isEmpty
+                                                  ? Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        const Divider(
+                                                          thickness: 1,
+                                                          color:
+                                                              Color(0xFFEEEEEE),
+                                                        ),
+                                                        Container(
+                                                          height: 34,
+                                                          width:
+                                                              double.infinity,
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .only(
+                                                                  right: 8,
+                                                                  bottom: 16),
+                                                          child: const Text(
+                                                            'Belum ada barang yang ditambahkan',
+                                                            style: TextStyle(
+                                                                color: Color(
+                                                                    0xFFB1B5C0),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w400,
+                                                                fontSize: 14),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    )
+                                                  : ListView.builder(
+                                                      shrinkWrap: true,
+                                                      physics:
+                                                          const NeverScrollableScrollPhysics(),
+                                                      itemCount:
+                                                          newproductList.length,
+                                                      itemBuilder:
+                                                          (context, index) {
+                                                        String harga =
+                                                            numberFormat.format(
+                                                                newproductList[
+                                                                        index]
+                                                                    .price);
+                                                        bool status =
+                                                            newproductList[index]
+                                                                        .status ==
+                                                                    'Produk Aktif'
+                                                                ? true
+                                                                : false;
+
+                                                        return Column(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .start,
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            GestureDetector(
+                                                              onTap: () {
+                                                                String
+                                                                    deskripsi =
+                                                                    newproductList[index]
+                                                                            .description ??
+                                                                        '';
+
+                                                                _showQuickAction(
+                                                                    context,
+                                                                    newproductList[index].productId ??
+                                                                        0,
+                                                                    newproductList[index]
+                                                                            .detailOutlets!
+                                                                            .first
+                                                                            .id ??
+                                                                        0,
+                                                                    newproductList[index].productName ??
+                                                                        '',
+                                                                    int.parse(harga.replaceAll(
+                                                                        RegExp(
+                                                                            r'[^\d]'),
+                                                                        '')),
+                                                                    deskripsi,
+                                                                    newproductList[index]
+                                                                            .detailCategories!
+                                                                            .first
+                                                                            .id ??
+                                                                        0,
+                                                                    newproductList[index].categoryNames ??
+                                                                        '',
+                                                                    status,
+                                                                    newproductList[index].unlimitedStock ==
+                                                                            1
+                                                                        ? 0
+                                                                        : newproductList[index]
+                                                                                .stock ??
+                                                                            0,
+                                                                    newproductList[index]
+                                                                                .unlimitedStock ==
+                                                                            1
+                                                                        ? true
+                                                                        : false,
+                                                                    newproductList[index]
+                                                                            .detailImages!
+                                                                            .last
+                                                                            .image ??
+                                                                        '',
+                                                                    newproductList[index]
+                                                                            .detailImages!
+                                                                            .last
+                                                                            .id ??
+                                                                        0);
+                                                              },
+                                                              child: Container(
+                                                                width: double
+                                                                    .infinity,
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  color: status
+                                                                      ? const Color(
+                                                                          0xFFFFFFFF)
+                                                                      : const Color(
+                                                                          0xFFEEEEEE),
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                              10),
+                                                                ),
+                                                                padding: const EdgeInsets
+                                                                    .symmetric(
+                                                                    vertical: 8,
+                                                                    horizontal:
+                                                                        16),
+                                                                child: Row(
                                                                   mainAxisAlignment:
                                                                       MainAxisAlignment
                                                                           .spaceBetween,
-                                                                  crossAxisAlignment:
-                                                                      CrossAxisAlignment
-                                                                          .start,
                                                                   children: [
-                                                                    Text(
-                                                                      prod[
-                                                                          'name'],
+                                                                    Container(
+                                                                      child:
+                                                                          Row(
+                                                                        mainAxisAlignment:
+                                                                            MainAxisAlignment.start,
+                                                                        children: [
+                                                                          Container(
+                                                                              width: 50,
+                                                                              height: 52,
+                                                                              padding: EdgeInsets.zero,
+                                                                              decoration: BoxDecoration(borderRadius: BorderRadius.circular(10)),
+                                                                              child: ClipRRect(
+                                                                                borderRadius: BorderRadius.circular(10),
+                                                                                child: newproductList[index].detailImages!.isEmpty
+                                                                                    ? const Placeholder()
+                                                                                    : CachedNetworkImage(
+                                                                                        fit: BoxFit.cover,
+                                                                                        width: 140,
+                                                                                        height: 140,
+                                                                                        imageUrl: _apiProduct.getImage(newproductList[index].detailImages!.last.image),
+                                                                                        progressIndicatorBuilder: (context, url, progress) {
+                                                                                          return Center(
+                                                                                            child: CircularProgressIndicator(
+                                                                                              value: progress.totalSize != null ? progress.downloaded / (progress.totalSize ?? 1) : null,
+                                                                                            ),
+                                                                                          );
+                                                                                        },
+                                                                                        errorWidget: (context, url, error) => const Icon(Icons.error),
+                                                                                      ),
+                                                                              )),
+                                                                          const SizedBox(
+                                                                            width:
+                                                                                16,
+                                                                          ),
+                                                                          Container(
+                                                                            width:
+                                                                                150,
+                                                                            height:
+                                                                                40,
+                                                                            child:
+                                                                                Column(
+                                                                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                                                              children: [
+                                                                                Flexible(
+                                                                                  child: Text(
+                                                                                    newproductList[index].productName ?? '',
+                                                                                    overflow: TextOverflow.ellipsis,
+                                                                                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: status ? const Color(0xFF303030F) : const Color(0xFF979899)),
+                                                                                  ),
+                                                                                ),
+                                                                                const SizedBox(
+                                                                                  height: 4,
+                                                                                ),
+                                                                                Row(
+                                                                                  mainAxisAlignment: MainAxisAlignment.start,
+                                                                                  mainAxisSize: MainAxisSize.min,
+                                                                                  children: [
+                                                                                    Text(
+                                                                                      harga,
+                                                                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Color(0xFF979899)),
+                                                                                    ),
+                                                                                    const SizedBox(
+                                                                                      width: 2,
+                                                                                    ),
+                                                                                    Icon(
+                                                                                      Icons.circle,
+                                                                                      color: const Color(0xFF979899).withOpacity(0.5),
+                                                                                      size: 4,
+                                                                                    ),
+                                                                                    const SizedBox(
+                                                                                      width: 2,
+                                                                                    ),
+                                                                                    Flexible(
+                                                                                      child: Text(
+                                                                                        'Stock ${newproductList[index].unlimitedStock == 1 ? 'Tak terbatas' : newproductList[index].stock}',
+                                                                                        overflow: TextOverflow.ellipsis,
+                                                                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: status ? const Color(0xFF979899) : const Color(0xFF979899)),
+                                                                                      ),
+                                                                                    ),
+                                                                                  ],
+                                                                                )
+                                                                              ],
+                                                                            ),
+                                                                          )
+                                                                        ],
+                                                                      ),
+                                                                    ),
+                                                                    Container(
+                                                                      // width: 47,
+                                                                      // height: 24,
+                                                                      padding:
+                                                                          EdgeInsets
+                                                                              .zero,
+                                                                      child:
+                                                                          TextButton(
+                                                                        onPressed:
+                                                                            () async {
+                                                                          final result = await Navigator.push(
+                                                                              context,
+                                                                              MaterialPageRoute(
+                                                                                  builder: (context) => Editbarang(
+                                                                                        name: newproductList[index].productName ?? '',
+                                                                                        deskripis: newproductList[index].description ?? '',
+                                                                                        category: newproductList[index].categoryNames ?? '',
+                                                                                        harga: newproductList[index].price ?? 0,
+                                                                                        imageUrl: newproductList[index].detailImages!.last.image!,
+                                                                                        unlimitedStock: newproductList[index].unlimitedStock == 1 ? true : false,
+                                                                                        idOutlet: newproductList[index].detailOutlets!.first.outletsId ?? 0,
+                                                                                        idProduct: newproductList[index].productId ?? 0,
+                                                                                        stock: newproductList[index].stock ?? 0,
+                                                                                        categoryRelasi: newproductList[index].detailCategories!.first.id ?? 0,
+                                                                                        imageRelasi: newproductList[index].detailImages!.last.id!,
+                                                                                      )));
+                                                                          if (result !=
+                                                                              null) {
+                                                                            final message =
+                                                                                result['message'];
+                                                                            final isDeleted =
+                                                                                result['isDeleted'];
+                                                                            // ignore: use_build_context_synchronously
+
+                                                                            if (isDeleted ==
+                                                                                true) {
+                                                                              setState(() {
+                                                                                _refreshData();
+                                                                              });
+                                                                              notif(message);
+                                                                            } else {
+                                                                              notif(message);
+                                                                              _refreshData();
+                                                                            }
+                                                                          }
+                                                                        },
+                                                                        child:
+                                                                            Row(
+                                                                          mainAxisAlignment:
+                                                                              MainAxisAlignment.start,
+                                                                          children: [
+                                                                            const Text(
+                                                                              'Edit',
+                                                                              style: TextStyle(fontSize: 14, color: Color(0xFF2E6CE9), fontWeight: FontWeight.w600),
+                                                                            ),
+                                                                            const SizedBox(
+                                                                              width: 4,
+                                                                            ),
+                                                                            SvgPicture.asset(
+                                                                              'asset/image/edit.svg',
+                                                                              width: 16,
+                                                                              height: 16,
+                                                                              color: const Color(0xFF2E6CE9),
+                                                                            )
+                                                                          ],
+                                                                        ),
+                                                                      ),
+                                                                    )
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              height: 12,
+                                                            )
+                                                          ],
+                                                        );
+                                                      },
+                                                    ),
+                                              newproductList.isEmpty
+                                                  ? const SizedBox.shrink()
+                                                  : const Divider(
+                                                      thickness: 1,
+                                                      color: Color(0xFFEEEEEE),
+                                                    ),
+                                            ],
+                                          );
+                                        },
+                                      )
+                                    : ListView.builder(
+                                        shrinkWrap: true,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 10, horizontal: 16),
+                                        itemCount: productListFilter.length,
+                                        physics:
+                                            const AlwaysScrollableScrollPhysics(),
+                                        itemBuilder: (context, index) {
+                                          String harga = numberFormat.format(
+                                              productListFilter[index].price);
+                                          bool status =
+                                              productListFilter[index].status ==
+                                                      'Produk Aktif'
+                                                  ? true
+                                                  : false;
+
+                                          return Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              GestureDetector(
+                                                onTap: () {
+                                                  String deskripsi =
+                                                      productListFilter[index]
+                                                              .description ??
+                                                          '';
+
+                                                  _showQuickAction(
+                                                      context,
+                                                      productListFilter[index]
+                                                              .productId ??
+                                                          0,
+                                                      productListFilter[index]
+                                                              .detailOutlets!
+                                                              .first
+                                                              .id ??
+                                                          0,
+                                                      productListFilter[index].productName ??
+                                                          '',
+                                                      int.parse(harga.replaceAll(
+                                                          RegExp(r'[^\d]'),
+                                                          '')),
+                                                      deskripsi,
+                                                      productListFilter[index]
+                                                              .detailCategories!
+                                                              .first
+                                                              .id ??
+                                                          0,
+                                                      productListFilter[index]
+                                                              .categoryNames ??
+                                                          '',
+                                                      status,
+                                                      productListFilter[index]
+                                                                  .unlimitedStock ==
+                                                              1
+                                                          ? 0
+                                                          : productListFilter[index]
+                                                                  .stock ??
+                                                              0,
+                                                      productListFilter[index]
+                                                                  .unlimitedStock ==
+                                                              1
+                                                          ? true
+                                                          : false,
+                                                      productListFilter[index]
+                                                              .detailImages!
+                                                              .last
+                                                              .image ??
+                                                          '',
+                                                      productListFilter[index]
+                                                              .detailImages!
+                                                              .last
+                                                              .id ??
+                                                          0);
+                                                },
+                                                child: Container(
+                                                  width: double.infinity,
+                                                  decoration: BoxDecoration(
+                                                    color: status
+                                                        ? const Color(
+                                                            0xFFFFFFFF)
+                                                        : const Color(
+                                                            0xFFEEEEEE),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            10),
+                                                  ),
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      vertical: 8,
+                                                      horizontal: 16),
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .spaceBetween,
+                                                    children: [
+                                                      Container(
+                                                        child: Row(
+                                                          mainAxisAlignment:
+                                                              MainAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            Container(
+                                                                width: 50,
+                                                                height: 52,
+                                                                padding:
+                                                                    EdgeInsets
+                                                                        .zero,
+                                                                decoration: BoxDecoration(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                            10)),
+                                                                child:
+                                                                    ClipRRect(
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                              10),
+                                                                  child: productListFilter[
+                                                                              index]
+                                                                          .detailImages!
+                                                                          .isEmpty
+                                                                      ? const Placeholder()
+                                                                      : CachedNetworkImage(
+                                                                          fit: BoxFit
+                                                                              .cover,
+                                                                          width:
+                                                                              140,
+                                                                          height:
+                                                                              140,
+                                                                          imageUrl: _apiProduct.getImage(productListFilter[index]
+                                                                              .detailImages!
+                                                                              .last
+                                                                              .image),
+                                                                          progressIndicatorBuilder: (context,
+                                                                              url,
+                                                                              progress) {
+                                                                            return Center(
+                                                                              child: CircularProgressIndicator(
+                                                                                value: progress.totalSize != null ? progress.downloaded / (progress.totalSize ?? 1) : null,
+                                                                              ),
+                                                                            );
+                                                                          },
+                                                                          errorWidget: (context, url, error) =>
+                                                                              const Icon(Icons.error),
+                                                                        ),
+                                                                )),
+                                                            const SizedBox(
+                                                              width: 16,
+                                                            ),
+                                                            Container(
+                                                              width: 150,
+                                                              height: 40,
+                                                              child: Column(
+                                                                mainAxisAlignment:
+                                                                    MainAxisAlignment
+                                                                        .spaceBetween,
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .start,
+                                                                children: [
+                                                                  Flexible(
+                                                                    child: Text(
+                                                                      productListFilter[index]
+                                                                              .productName ??
+                                                                          '',
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
                                                                       style: TextStyle(
                                                                           fontWeight: FontWeight
                                                                               .w700,
                                                                           fontSize:
                                                                               14,
                                                                           color: status
-                                                                              ? (isSelected ? const Color(0xFFFFFFFF) : const Color(0xFF303030))
+                                                                              ? const Color(0xFF303030F)
                                                                               : const Color(0xFF979899)),
                                                                     ),
-                                                                    const SizedBox(
-                                                                      height: 4,
-                                                                    ),
-                                                                    Row(
-                                                                      mainAxisAlignment:
-                                                                          MainAxisAlignment
-                                                                              .start,
-                                                                      mainAxisSize:
-                                                                          MainAxisSize
-                                                                              .min,
-                                                                      children: [
-                                                                        Text(
-                                                                          harga,
-                                                                          style: const TextStyle(
-                                                                              fontSize: 12,
-                                                                              fontWeight: FontWeight.w500,
-                                                                              color: Color(0xFF979899)),
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          width:
-                                                                              2,
-                                                                        ),
-                                                                        Icon(
-                                                                          Icons
-                                                                              .circle,
-                                                                          color:
-                                                                              const Color(0xFF979899).withOpacity(0.5),
-                                                                          size:
-                                                                              4,
-                                                                        ),
-                                                                        const SizedBox(
-                                                                          width:
-                                                                              2,
-                                                                        ),
-                                                                        Text(
-                                                                          'Stock: ${prod['stock']}',
+                                                                  ),
+                                                                  const SizedBox(
+                                                                    height: 4,
+                                                                  ),
+                                                                  Row(
+                                                                    mainAxisAlignment:
+                                                                        MainAxisAlignment
+                                                                            .start,
+                                                                    mainAxisSize:
+                                                                        MainAxisSize
+                                                                            .min,
+                                                                    children: [
+                                                                      Text(
+                                                                        harga,
+                                                                        style: const TextStyle(
+                                                                            fontSize:
+                                                                                12,
+                                                                            fontWeight:
+                                                                                FontWeight.w500,
+                                                                            color: Color(0xFF979899)),
+                                                                      ),
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            2,
+                                                                      ),
+                                                                      Icon(
+                                                                        Icons
+                                                                            .circle,
+                                                                        color: const Color(0xFF979899)
+                                                                            .withOpacity(0.5),
+                                                                        size: 4,
+                                                                      ),
+                                                                      const SizedBox(
+                                                                        width:
+                                                                            2,
+                                                                      ),
+                                                                      Flexible(
+                                                                        child:
+                                                                            Text(
+                                                                          'Stock ${productListFilter[index].unlimitedStock == 1 ? 'Tak terbatas' : productListFilter[index].stock}',
+                                                                          overflow:
+                                                                              TextOverflow.ellipsis,
                                                                           style: TextStyle(
                                                                               fontSize: 12,
                                                                               fontWeight: FontWeight.w500,
                                                                               color: status ? const Color(0xFF979899) : const Color(0xFF979899)),
                                                                         ),
-                                                                      ],
-                                                                    )
-                                                                  ],
-                                                                ),
+                                                                      ),
+                                                                    ],
+                                                                  )
+                                                                ],
+                                                              ),
+                                                            )
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      Container(
+                                                        // width: 47,
+                                                        // height: 24,
+                                                        padding:
+                                                            EdgeInsets.zero,
+                                                        child: TextButton(
+                                                          onPressed: () async {
+                                                            final result =
+                                                                await Navigator.push(
+                                                                    context,
+                                                                    MaterialPageRoute(
+                                                                        builder: (context) => Editbarang(
+                                                                              name: productListFilter[index].productName ?? '',
+                                                                              deskripis: productListFilter[index].description ?? '',
+                                                                              category: productListFilter[index].categoryNames ?? '',
+                                                                              harga: productListFilter[index].price ?? 0,
+                                                                              imageUrl: productListFilter[index].detailImages!.last.image!,
+                                                                              unlimitedStock: productListFilter[index].unlimitedStock == 1 ? true : false,
+                                                                              idOutlet: productListFilter[index].detailOutlets!.first.outletsId ?? 0,
+                                                                              idProduct: productListFilter[index].productId ?? 0,
+                                                                              stock: productListFilter[index].stock ?? 0,
+                                                                              categoryRelasi: productListFilter[index].detailCategories!.first.id ?? 0,
+                                                                              imageRelasi: productListFilter[index].detailImages!.last.id!,
+                                                                            )));
+                                                            if (result !=
+                                                                null) {
+                                                              final message =
+                                                                  result[
+                                                                      'message'];
+                                                              final isDeleted =
+                                                                  result[
+                                                                      'isDeleted'];
+                                                              // ignore: use_build_context_synchronously
+
+                                                              if (isDeleted ==
+                                                                  true) {
+                                                                setState(() {
+                                                                  _refreshData();
+                                                                });
+
+                                                                Notifsucces.showNotif(
+                                                                    context:
+                                                                        context,
+                                                                    description:
+                                                                        message);
+                                                              } else {
+                                                                Notifsucces.showNotif(
+                                                                    context:
+                                                                        context,
+                                                                    description:
+                                                                        message);
+                                                                _refreshData();
+                                                              }
+                                                            }
+                                                          },
+                                                          child: Row(
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              const Text(
+                                                                'Edit',
+                                                                style: TextStyle(
+                                                                    fontSize:
+                                                                        14,
+                                                                    color: Color(
+                                                                        0xFF2E6CE9),
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600),
+                                                              ),
+                                                              const SizedBox(
+                                                                width: 4,
+                                                              ),
+                                                              SvgPicture.asset(
+                                                                'asset/image/edit.svg',
+                                                                width: 16,
+                                                                height: 16,
+                                                                color: const Color(
+                                                                    0xFF2E6CE9),
                                                               )
                                                             ],
                                                           ),
                                                         ),
-                                                        Container(
-                                                          // width: 47,
-                                                          // height: 24,
-                                                          padding:
-                                                              EdgeInsets.zero,
-                                                          child: TextButton(
-                                                            onPressed:
-                                                                () async {
-                                                              final result =
-                                                                  await Navigator.push(
-                                                                      context,
-                                                                      MaterialPageRoute(
-                                                                          builder: (context) => Editbarang(
-                                                                                name: prod['name'],
-                                                                                deskripis: 'Ulalala',
-                                                                                category: category,
-                                                                                harga: prod['price'],
-                                                                                imageUrl: 'Bola ini hijau',
-                                                                              )));
-                                                              if (result !=
-                                                                  null) {
-                                                                final message =
-                                                                    result[
-                                                                        'message'];
-                                                                final isDeleted =
-                                                                    result[
-                                                                        'isDeleted'];
-                                                                // ignore: use_build_context_synchronously
-
-                                                                if (isDeleted ==
-                                                                    true) {
-                                                                  setState(() {
-                                                                    product[category]?.removeWhere((item) =>
-                                                                        item[
-                                                                            'name'] ==
-                                                                        prod[
-                                                                            'name']);
-                                                                  });
-                                                                  notif(
-                                                                      message);
-                                                                } else {
-                                                                  notif(
-                                                                      message);
-                                                                }
-                                                              }
-                                                            },
-                                                            child: Row(
-                                                              mainAxisAlignment:
-                                                                  MainAxisAlignment
-                                                                      .start,
-                                                              children: [
-                                                                const Text(
-                                                                  'Edit',
-                                                                  style: TextStyle(
-                                                                      fontSize:
-                                                                          14,
-                                                                      color: Color(
-                                                                          0xFF2E6CE9),
-                                                                      fontWeight:
-                                                                          FontWeight
-                                                                              .w600),
-                                                                ),
-                                                                const SizedBox(
-                                                                  width: 4,
-                                                                ),
-                                                                SvgPicture
-                                                                    .asset(
-                                                                  'asset/image/edit.svg',
-                                                                  width: 16,
-                                                                  height: 16,
-                                                                  color: const Color(
-                                                                      0xFF2E6CE9),
-                                                                )
-                                                              ],
-                                                            ),
-                                                          ),
-                                                        )
-                                                      ],
-                                                    ),
+                                                      )
+                                                    ],
                                                   ),
                                                 ),
-                                                const SizedBox(
-                                                  height: 12,
-                                                )
-                                              ],
-                                            );
-                                          },
-                                        ),
-                                  totalbarang == 0
-                                      ? const SizedBox.shrink()
-                                      : const Divider(
-                                          thickness: 1,
-                                          color: Color(0xFFEEEEEE),
-                                        ),
-                                ],
-                              );
-                            },
-                          ),
-                          const SizedBox(
-                            height: 40,
-                          )
-                        ],
+                                              ),
+                                              const SizedBox(
+                                                height: 12,
+                                              )
+                                            ],
+                                          );
+                                        },
+                                      ),
+                            const SizedBox(
+                              height: 40,
+                            )
+                          ],
+                        ),
                       )),
                 ),
                 Align(

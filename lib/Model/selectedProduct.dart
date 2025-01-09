@@ -1,12 +1,18 @@
 class SelectedProduct {
+  final int id;
   final String name;
-  final int stock;
+  final String imageUrl;
+  int unlimitedStock;
+  int? stock;
   int quantity;
   final int price;
 
   SelectedProduct(
       {required this.name,
-      required this.stock,
+      this.stock,
+      required this.unlimitedStock,
+      required this.id,
+      required this.imageUrl,
       required this.quantity,
       required this.price});
 }

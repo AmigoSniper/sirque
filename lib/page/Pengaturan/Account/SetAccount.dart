@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:salescheck/component/customButtonColor.dart';
 import 'package:salescheck/page/boardingPage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Setaccount extends StatefulWidget {
   const Setaccount({super.key});
@@ -30,18 +31,10 @@ class _SetaccountState extends State<Setaccount> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      height: 24,
-                      width: double.infinity,
-                      alignment: Alignment.topRight,
-                      child: IconButton(
-                          padding: EdgeInsets.zero,
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                          icon: const Icon(
-                            Icons.close,
-                            size: 24,
-                          )),
+                      width: 50,
+                      height: 4,
+                      color: const Color(0xFFE9E9E9),
+                      margin: const EdgeInsets.only(bottom: 16),
                     ),
                     Container(
                       width: 66,
@@ -110,7 +103,11 @@ class _SetaccountState extends State<Setaccount> {
                                 alignment: Alignment.center,
                                 height: 48,
                                 color: const Color(0xFFFF3E1D),
-                                onPressed: () {
+                                onPressed: () async {
+                                  final SharedPreferences prefs =
+                                      await SharedPreferences.getInstance();
+                                  await prefs.remove('userData');
+
                                   Navigator.pushAndRemoveUntil(
                                     context,
                                     MaterialPageRoute(
@@ -158,18 +155,10 @@ class _SetaccountState extends State<Setaccount> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          height: 24,
-                          width: double.infinity,
-                          alignment: Alignment.topRight,
-                          child: IconButton(
-                              padding: EdgeInsets.zero,
-                              onPressed: () {
-                                Navigator.pop(context);
-                              },
-                              icon: const Icon(
-                                Icons.close,
-                                size: 24,
-                              )),
+                          width: 50,
+                          height: 4,
+                          color: const Color(0xFFE9E9E9),
+                          margin: const EdgeInsets.only(bottom: 16),
                         ),
                         Container(
                           width: 66,

@@ -1,6 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:salescheck/Model/Outlet.dart';
+import 'package:salescheck/Model/outlets.dart';
+import 'package:salescheck/Service/ApiOutlet.dart';
 import 'package:salescheck/page/Pengaturan/KelolaOutlet/AddOutlet.dart';
 import 'package:salescheck/page/Pengaturan/KelolaOutlet/EditOutlet.dart';
 import 'package:toastification/toastification.dart';
@@ -16,53 +19,15 @@ class Kelolaoutlettrue extends StatefulWidget {
 }
 
 class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
-  List<Outlet> listOutlet = [
-    Outlet(
-      alamat:
-          'RRR9+5FH, Mangu, Sodo, Kec. Pakel, Kabupaten Tulungagung, Jawa Timur 66273',
-      photo: '',
-      utama: true,
-      noCabang: '230981120',
-      name: 'Sportstation Pakel',
-      kepalaCabang: 'AmigoSniper',
-    ),
-    Outlet(
-      alamat: 'JL. Raya Barat No.7, Kec. Kauman, Tulungagung, Jawa Timur 66261',
-      photo: '',
-      utama: false,
-      noCabang: '230981121',
-      name: 'Sportstation Kauman',
-      kepalaCabang: 'Santoso',
-    ),
-    Outlet(
-      alamat:
-          'JL. MT. Haryono No.45, Kec. Kedungwaru, Tulungagung, Jawa Timur 66224',
-      photo: '',
-      utama: false,
-      noCabang: '230981122',
-      name: 'Sportstation Kedungwaru',
-      kepalaCabang: 'Tosuhinken',
-    ),
-    Outlet(
-      alamat: 'JL. Basuki Rahmat No.101, Kec. Tulungagung, Jawa Timur 66219',
-      photo: '',
-      utama: false,
-      noCabang: '230981123',
-      name: 'Sportstation Tulungagung',
-      kepalaCabang: 'Zhongli',
-    ),
-    Outlet(
-      alamat: 'JL. Pahlawan No.23, Kec. Ngunut, Tulungagung, Jawa Timur 66292',
-      photo: '',
-      utama: false,
-      noCabang: '230981124',
-      name: 'Sportstation Ngunut',
-      kepalaCabang: 'AmigoSniper',
-    ),
-  ];
+  final Apioutlet _apioutlet = new Apioutlet();
+  late Future<void> _loadDataFuture;
+  List<Outlets> listOutlets = [];
+
+  List<Outlet> listOutlet = [];
   void notif(String title) {
     toastification.show(
-        margin: const EdgeInsets.only(right: 15),
+        alignment: Alignment.topCenter,
+        margin: const EdgeInsets.only(right: 16, left: 16),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         autoCloseDuration: const Duration(seconds: 8),
         progressBarTheme: const ProgressIndicatorThemeData(
@@ -95,7 +60,14 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
         ));
   }
 
-  void _quickAccesForm(BuildContext context, Outlet outlet) {
+  Future<void> _readAndPrintPegawaiData() async {
+    listOutlets = await _apioutlet.getAllOutletApi();
+    setState(() {
+      listOutlets = listOutlets;
+    });
+  }
+
+  void _quickAccesForm(BuildContext context, Outlets outlet) {
     showModalBottomSheet(
       backgroundColor: const Color(0xFFFBFBFB),
       context: context,
@@ -126,11 +98,41 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
                       width: 140,
                       height: 140,
                       decoration: const BoxDecoration(
-                          borderRadius: BorderRadius.all(Radius.circular(10)),
-                          color: Colors.red,
-                          image: DecorationImage(
-                              image: AssetImage('asset/kelolaOutlet/Frame.png'),
-                              fit: BoxFit.fitHeight)),
+                        borderRadius: BorderRadius.all(Radius.circular(10)),
+                        color: Colors.transparent,
+                      ),
+                      child: ClipRRect(
+                        borderRadius:
+                            const BorderRadius.all(Radius.circular(10)),
+                        child: CachedNetworkImage(
+                          fit: BoxFit.fitHeight,
+                          imageUrl: _apioutlet.getImage(outlet.image),
+                          progressIndicatorBuilder: (context, url, progress) {
+                            return Center(
+                                child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  value: progress.totalSize != null
+                                      ? progress.downloaded /
+                                          (progress.totalSize ?? 1)
+                                      : null,
+                                ),
+                                Text(
+                                  '${(progress.downloaded / 1000000).toStringAsFixed(2)} / ${(progress.totalSize! / 1000000).toStringAsFixed(2)} MB',
+                                  style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black),
+                                ),
+                              ],
+                            ));
+                          },
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.error),
+                        ),
+                      ),
                     ),
                     Flexible(
                       child: Container(
@@ -157,7 +159,7 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
                               ),
                             ),
                             Text(
-                              outlet.name,
+                              outlet.namaOutlet ?? '',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -169,7 +171,7 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
                               height: 12,
                             ),
                             Text(
-                              outlet.alamat,
+                              outlet.alamat ?? '',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -191,7 +193,7 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
                                     color: Color(0xFFA3A3A3)),
                                 children: [
                                   TextSpan(
-                                    text: outlet.kepalaCabang,
+                                    text: outlet.nameUser,
                                     style: const TextStyle(
                                         color: Color(0xFF000000)),
                                   ),
@@ -246,21 +248,12 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
                             final isDeleted = result['isDeleted'];
                             // ignore: use_build_context_synchronously
 
-                            print(message);
-                            print(isDeleted);
                             if (isDeleted == true) {
-                              print('No cabang : ${outlet.noCabang}');
-                              setState(() {
-                                //delete item
-
-                                // outlet.removeWhere(
-                                //     (item) => item.noCab == outlet.noCabang);
-                                listOutlet.removeWhere(
-                                    (item) => item.noCabang == outlet.noCabang);
-                              });
                               notif(message);
+                              _refreshData();
                             } else {
                               notif(message);
+                              _refreshData();
                             }
                           }
                         },
@@ -283,58 +276,18 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
 
   Future<void> _refreshData() async {
     // Simulasi delay untuk menunggu data baru
-    await Future.delayed(Duration(seconds: 2));
+    await Future.delayed(const Duration(seconds: 2));
     listOutlet.clear();
+    listOutlets.clear();
     // Perbarui data dan setState untuk memperbarui tampilan
-    setState(() {
-      listOutlet = [
-        Outlet(
-          alamat:
-              'RRR9+5FH, Mangu, Sodo, Kec. Pakel, Kabupaten Tulungagung, Jawa Timur 66273',
-          photo: '',
-          utama: true,
-          noCabang: '230981120',
-          name: 'Sportstation Pakel',
-          kepalaCabang: 'AmigoSniper',
-        ),
-        Outlet(
-          alamat:
-              'JL. Raya Barat No.7, Kec. Kauman, Tulungagung, Jawa Timur 66261',
-          photo: '',
-          utama: false,
-          noCabang: '230981121',
-          name: 'Sportstation Kauman',
-          kepalaCabang: 'Santoso',
-        ),
-        Outlet(
-          alamat:
-              'JL. MT. Haryono No.45, Kec. Kedungwaru, Tulungagung, Jawa Timur 66224',
-          photo: '',
-          utama: false,
-          noCabang: '230981122',
-          name: 'Sportstation Kedungwaru',
-          kepalaCabang: 'Tosuhinken',
-        ),
-        Outlet(
-          alamat:
-              'JL. Basuki Rahmat No.101, Kec. Tulungagung, Jawa Timur 66219',
-          photo: '',
-          utama: false,
-          noCabang: '230981123',
-          name: 'Sportstation Tulungagung',
-          kepalaCabang: 'Zhongli',
-        ),
-        Outlet(
-          alamat:
-              'JL. Pahlawan No.23, Kec. Ngunut, Tulungagung, Jawa Timur 66292',
-          photo: '',
-          utama: false,
-          noCabang: '230981124',
-          name: 'Sportstation Ngunut',
-          kepalaCabang: 'AmigoSniper',
-        ),
-      ];
-    });
+    await _readAndPrintPegawaiData();
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _loadDataFuture = _readAndPrintPegawaiData();
   }
 
   @override
@@ -344,125 +297,228 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
         RefreshIndicator(
           onRefresh: _refreshData,
           child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: ListView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              shrinkWrap: true,
-              itemCount: listOutlet.length,
-              itemBuilder: (context, index) {
-                return GestureDetector(
-                  onTap: () {
-                    _quickAccesForm(context, listOutlet[index]);
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 16, horizontal: 16),
-                    decoration: const BoxDecoration(
-                        color: Color(0xFFFFFFFF),
-                        borderRadius: BorderRadius.all(Radius.circular(8))),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.start,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                            width: double.infinity,
-                            height: 106,
-                            decoration: const BoxDecoration(
-                                borderRadius:
-                                    BorderRadius.all(Radius.circular(10)),
-                                image: DecorationImage(
-                                    image: AssetImage(
-                                        'asset/kelolaOutlet/Frame.png'),
-                                    fit: BoxFit.fitWidth)),
-                            child: Stack(
-                              children: [
-                                listOutlet[index].utama
-                                    ? Positioned(
-                                        left: 0,
-                                        top: 10,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              vertical: 4, horizontal: 12),
-                                          width: 79,
-                                          height: 24,
-                                          decoration: const BoxDecoration(
-                                              color: Color(0xFF2E6CE9),
-                                              borderRadius: BorderRadius.only(
-                                                  topRight: Radius.circular(6),
-                                                  bottomRight:
-                                                      Radius.circular(6))),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.start,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            children: [
-                                              SvgPicture.asset(
-                                                  'asset/kelolaOutlet/shop.svg'),
-                                              const Text(
-                                                'Utama',
-                                                style: TextStyle(
-                                                    color: Color(0xFFFFFFFF),
-                                                    fontSize: 12,
-                                                    fontWeight:
-                                                        FontWeight.w600),
-                                              )
-                                            ],
-                                          ),
-                                        ))
-                                    : const SizedBox.shrink()
-                              ],
-                            )),
-                        const SizedBox(
-                          height: 12,
-                        ),
-                        Container(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: FutureBuilder(
+                future: _loadDataFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Text('Loading...'),
+                    );
+                  } else if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error: ${snapshot.error}'),
+                    );
+                  } else {
+                    if (listOutlets.isEmpty) {
+                      return Container(
                           alignment: Alignment.center,
-                          width: 82,
-                          height: 24,
-                          decoration: const BoxDecoration(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(100)),
-                              color: Color(0xFFF0F9FF)),
-                          child: const Text(
-                            'ID SPO-01',
-                            style: TextStyle(
-                                color: Color(0xFF0EA5E9),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500),
-                          ),
-                        ),
-                        const SizedBox(
-                          height: 12,
-                        ),
-                        Text(
-                          listOutlet[index].name,
-                          style: const TextStyle(
-                              color: Color(0xFF000000),
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(
-                          height: 12,
-                        ),
-                        Text(
-                          listOutlet[index].alamat,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              color: Color(0xFFA3A3A3),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+                          height: 375,
+                          width: 375,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.max,
+                            children: [
+                              SvgPicture.asset(
+                                'asset/pegawai/Group 33979.svg',
+                                width: 105,
+                                height: 105,
+                              ),
+                              const SizedBox(
+                                height: 12,
+                              ),
+                              const Text(
+                                'Belum ada data outlet tersedia',
+                                style: TextStyle(
+                                    color: Color(0xFFB1B5C0),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500),
+                              )
+                            ],
+                          ));
+                    } else {
+                      return ListView.builder(
+                        physics: const NeverScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                            vertical: 16, horizontal: 16),
+                        shrinkWrap: true,
+                        itemCount: listOutlets.length,
+                        itemBuilder: (context, index) {
+                          return GestureDetector(
+                            onTap: () {
+                              _quickAccesForm(context, listOutlets[index]);
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 16),
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16, horizontal: 16),
+                              decoration: const BoxDecoration(
+                                  color: Color(0xFFFFFFFF),
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(8))),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                      width: double.infinity,
+                                      height: 106,
+                                      decoration: const BoxDecoration(
+                                        borderRadius: BorderRadius.all(
+                                            Radius.circular(10)),
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          ClipRRect(
+                                            borderRadius:
+                                                const BorderRadius.all(
+                                                    Radius.circular(10)),
+                                            child: CachedNetworkImage(
+                                              fit: BoxFit.fitWidth,
+                                              width: double.infinity,
+                                              height: 140,
+                                              imageUrl: _apioutlet.getImage(
+                                                  listOutlets[index].image),
+                                              progressIndicatorBuilder:
+                                                  (context, url, progress) {
+                                                return Center(
+                                                    child: Column(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    CircularProgressIndicator(
+                                                      value: progress
+                                                                  .totalSize !=
+                                                              null
+                                                          ? progress
+                                                                  .downloaded /
+                                                              (progress
+                                                                      .totalSize ??
+                                                                  1)
+                                                          : null,
+                                                    ),
+                                                    if (progress.totalSize !=
+                                                        null)
+                                                      Text(
+                                                        '${(progress.downloaded / 1000000).toStringAsFixed(2)} / ${(progress.totalSize! / 1000000).toStringAsFixed(2)} MB',
+                                                        style: const TextStyle(
+                                                          fontSize: 12,
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          color: Colors.black,
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ));
+                                              },
+                                              errorWidget:
+                                                  (context, url, error) =>
+                                                      const Icon(Icons.error),
+                                            ),
+                                          ),
+                                          listOutlets[index].posisi ==
+                                                  'Toko Utama'
+                                              ? Positioned(
+                                                  left: 0,
+                                                  top: 10,
+                                                  child: Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        vertical: 4,
+                                                        horizontal: 12),
+                                                    width: 79,
+                                                    height: 24,
+                                                    decoration: const BoxDecoration(
+                                                        color:
+                                                            Color(0xFF2E6CE9),
+                                                        borderRadius:
+                                                            BorderRadius.only(
+                                                                topRight: Radius
+                                                                    .circular(
+                                                                        6),
+                                                                bottomRight: Radius
+                                                                    .circular(
+                                                                        6))),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .start,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        SvgPicture.asset(
+                                                            'asset/kelolaOutlet/shop.svg'),
+                                                        const Text(
+                                                          'Utama',
+                                                          style: TextStyle(
+                                                              color: Color(
+                                                                  0xFFFFFFFF),
+                                                              fontSize: 12,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600),
+                                                        )
+                                                      ],
+                                                    ),
+                                                  ))
+                                              : const SizedBox.shrink()
+                                        ],
+                                      )),
+                                  const SizedBox(
+                                    height: 12,
+                                  ),
+                                  Container(
+                                    alignment: Alignment.center,
+                                    width: 82,
+                                    height: 24,
+                                    decoration: const BoxDecoration(
+                                        borderRadius: BorderRadius.all(
+                                            Radius.circular(100)),
+                                        color: Color(0xFFF0F9FF)),
+                                    child: const Text(
+                                      'ID SPO-01',
+                                      style: TextStyle(
+                                          color: Color(0xFF0EA5E9),
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500),
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: 12,
+                                  ),
+                                  Text(
+                                    listOutlets[index].namaOutlet ?? '',
+                                    style: const TextStyle(
+                                        color: Color(0xFF000000),
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(
+                                    height: 12,
+                                  ),
+                                  Text(
+                                    listOutlets[index].alamat ?? '',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: Color(0xFFA3A3A3),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                  }
+                },
+              )),
         ),
         Align(
             alignment: Alignment.bottomCenter,
@@ -481,6 +537,7 @@ class _KelolaoutlettrueState extends State<Kelolaoutlettrue> {
                         // ignore: use_build_context_synchronously
 
                         notif(result);
+                        _refreshData();
                       }
                     },
                     child: Container(

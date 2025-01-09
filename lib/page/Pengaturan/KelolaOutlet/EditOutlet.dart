@@ -6,15 +6,20 @@ import 'package:flutter_svg/svg.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:salescheck/Model/outlets.dart';
 import 'package:salescheck/component/inputTextField.dart';
 
 import '../../../Model/Outlet.dart';
+import '../../../Model/User.dart';
+import '../../../Service/ApiOutlet.dart';
+import '../../../Service/ApiPegawai.dart';
 import '../../../component/customButtonPrimary.dart';
 import '../../../component/customButtonColor.dart';
 import '../../../component/customDropDown.dart';
+import '../../../component/notifError.dart';
 
 class Editoutlet extends StatefulWidget {
-  final Outlet outlet;
+  final Outlets outlet;
   const Editoutlet({super.key, required this.outlet});
 
   @override
@@ -22,6 +27,8 @@ class Editoutlet extends StatefulWidget {
 }
 
 class _EditoutletState extends State<Editoutlet> {
+  final Apioutlet _api = new Apioutlet();
+  final Apipegawai _apipegawai = new Apipegawai();
   File? _image;
   bool permissionGalery = false;
   final TextEditingController namecontroler = TextEditingController();
@@ -34,30 +41,24 @@ class _EditoutletState extends State<Editoutlet> {
   String? selectCoordinator;
   FocusNode _focusNodeName = FocusNode();
   FocusNode _focusNodealamat = FocusNode();
-  List<String> koordinatorOptions = [
-    'AmigoSniper',
-    'Santoso',
-    'Tosuhinken',
-    'Zhongli'
-  ];
-
+  List<User> userkoordinatorOptions = [];
+  List<String> koordinatorOptions = [];
+  int? idKoordinator;
   Future<void> _requestPermission() async {
     PermissionStatus status = await Permission.manageExternalStorage.status;
-    print('Memnita permission');
+
     if (status.isDenied || status.isPermanentlyDenied) {
       await Permission.manageExternalStorage.request();
-      print('Ditolak permission');
+
       // _showPermissionDialog(); // Tampilkan Alert Dialog jika izin ditolak
       setState(() {
         permissionGalery = false;
       });
     } else if (status.isGranted) {
-      print('Diterima permission');
       setState(() {
         permissionGalery = true;
       });
     } else {
-      print('Memnita ulang permission');
       await Permission.photos.request(); // Meminta izin
       if (await Permission.photos.isGranted) {
         _pickImage(); // Lanjutkan jika izin diberikan setelah diminta
@@ -131,13 +132,38 @@ class _EditoutletState extends State<Editoutlet> {
     return null;
   }
 
+  Future<void> _readAndPrintPegawaiData() async {
+    userkoordinatorOptions = await _apipegawai.getPegawaiApi();
+
+    if (_apipegawai.statusCode == 200) {
+      setState(() {
+        for (var element in userkoordinatorOptions) {
+          koordinatorOptions.add(element.name);
+        }
+      });
+    } else {}
+  }
+
+  Future<void> selectKoordinator() async {
+    final koordinator = userkoordinatorOptions.firstWhere(
+      (koordinator) => koordinator.name == selectCoordinator,
+    );
+
+    // Ambil id_outlet
+    setState(() {
+      idKoordinator = koordinator.id;
+    });
+  }
+
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    selectCoordinator = widget.outlet.kepalaCabang;
-    namecontroler.text = widget.outlet.name;
-    alamatcontroler.text = widget.outlet.alamat;
+    _readAndPrintPegawaiData();
+    selectCoordinator = widget.outlet.nameUser;
+    idKoordinator = widget.outlet.koordinator;
+    namecontroler.text = widget.outlet.namaOutlet ?? '';
+    alamatcontroler.text = widget.outlet.alamat ?? '';
     _requestPermission();
     _focusNodeName.addListener(() {
       setState(() {
@@ -268,7 +294,9 @@ class _EditoutletState extends State<Editoutlet> {
                                               Radius.circular(8)),
                                           color: Color(0XFFF6F6F6)),
                                       child: TextFormField(
-                                        initialValue: widget.outlet.noCabang,
+                                        initialValue:
+                                            widget.outlet.idOutlet.toString() ??
+                                                '',
                                         enabled: false,
                                         // validator: (value) {
                                         //   if (value == null || value.isEmpty) {
@@ -363,24 +391,35 @@ class _EditoutletState extends State<Editoutlet> {
                                                                           10),
                                                               child:
                                                                   ColorFiltered(
-                                                                colorFilter:
-                                                                    ColorFilter
-                                                                        .mode(
-                                                                  Colors.black
-                                                                      .withOpacity(
-                                                                          0.2),
-                                                                  BlendMode
-                                                                      .darken,
-                                                                ),
-                                                                child:
-                                                                    Image.asset(
-                                                                  'asset/kelolaOutlet/Frame.png',
-                                                                  fit: BoxFit
-                                                                      .cover,
-                                                                  width: 105,
-                                                                  height: 105,
-                                                                ),
-                                                              ))),
+                                                                      colorFilter:
+                                                                          ColorFilter
+                                                                              .mode(
+                                                                        Colors
+                                                                            .black
+                                                                            .withOpacity(0.2),
+                                                                        BlendMode
+                                                                            .darken,
+                                                                      ),
+                                                                      child: Image
+                                                                          .network(
+                                                                        _api.getImage(widget
+                                                                            .outlet
+                                                                            .image),
+                                                                        errorBuilder: (context,
+                                                                            error,
+                                                                            stackTrace) {
+                                                                          return Image
+                                                                              .asset(
+                                                                            'asset/kelolaOutlet/Frame.png',
+                                                                            fit:
+                                                                                BoxFit.cover,
+                                                                            width:
+                                                                                105,
+                                                                            height:
+                                                                                105,
+                                                                          );
+                                                                        },
+                                                                      )))),
                                                       SizedBox(
                                                         height: 24,
                                                         width: 67,
@@ -489,6 +528,7 @@ class _EditoutletState extends State<Editoutlet> {
                                       setState(() {
                                         selectCoordinator = p0;
                                       });
+                                      selectKoordinator();
                                     },
                                     hintText: 'Pilih Kategori',
                                     heightItem: 50)
@@ -507,7 +547,7 @@ class _EditoutletState extends State<Editoutlet> {
                                     context,
                                     {
                                       'message':
-                                          'Cabang ${widget.outlet.name} berhasil dihapus',
+                                          'Cabang ${widget.outlet.namaOutlet} berhasil dihapus',
                                       'isDeleted': true,
                                     },
                                   );
@@ -570,14 +610,28 @@ class _EditoutletState extends State<Editoutlet> {
                       child: customButtonPrimary(
                           alignment: Alignment.center,
                           height: 48,
-                          onPressed: () {
-                            Navigator.pop(
-                              context,
-                              {
-                                'message': 'Berhasil mengedit Toko',
-                                'isDeleted': false,
-                              },
-                            );
+                          onPressed: () async {
+                            await _api.editOutletApi(
+                                id: widget.outlet.idOutlet ?? 0,
+                                nama: namecontroler.text,
+                                alamat: alamatcontroler.text,
+                                image: _image,
+                                KoordinatorId: idKoordinator);
+
+                            if (_api.statusCode == 200 ||
+                                _api.statusCode == 201) {
+                              Navigator.pop(
+                                context,
+                                {
+                                  'message':
+                                      'Berhasil mengedit Toko ${namecontroler.text}',
+                                  'isDeleted': false,
+                                },
+                              );
+                            } else {
+                              Notiferror.showNotif(
+                                  context: context, description: _api.message);
+                            }
                           },
                           child: const Text(
                             'Simpan',

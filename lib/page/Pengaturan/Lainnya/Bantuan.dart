@@ -55,12 +55,12 @@ class _BantuanState extends State<Bantuan> {
                     Expanded(
                       child: TextField(
                         onChanged: (value) {
-                          // print('cari');
+                          //
                           // setState(() {
                           //   searchQuery = search.text;
                           // });
                           // searchfunction();
-                          // print('hasil');
+                          //
                         },
                         style: const TextStyle(
                             fontSize: 14,

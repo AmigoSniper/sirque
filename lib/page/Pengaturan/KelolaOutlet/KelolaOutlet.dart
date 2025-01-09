@@ -7,7 +7,8 @@ import 'Kelolaoutletfalse.dart';
 import 'kelolaOutlettrue.dart';
 
 class Kelolaoutlet extends StatefulWidget {
-  const Kelolaoutlet({super.key});
+  final bool? premisOutlet;
+  const Kelolaoutlet({super.key, this.premisOutlet});
 
   @override
   State<Kelolaoutlet> createState() => _KelolaoutletState();
@@ -36,6 +37,15 @@ class _KelolaoutletState extends State<Kelolaoutlet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Align(
+                    alignment: Alignment.center,
+                    child: Container(
+                      width: 50,
+                      height: 4,
+                      color: const Color(0xFFE9E9E9),
+                      margin: const EdgeInsets.only(bottom: 16),
+                    ),
+                  ),
                   SizedBox(
                     height: 500,
                     width: double.infinity,
@@ -258,6 +268,14 @@ class _KelolaoutletState extends State<Kelolaoutlet> {
         ],
       ),
     );
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+
+    permisOpen = widget.premisOutlet ?? false;
   }
 
   @override

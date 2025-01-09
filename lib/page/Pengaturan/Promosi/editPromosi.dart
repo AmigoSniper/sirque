@@ -8,20 +8,26 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:intl/intl.dart';
 import 'package:salescheck/Model/diskonModel.dart';
 
+import '../../../Model/outlets.dart';
+import '../../../Model/promosi.dart';
+import '../../../Service/ApiPromosi.dart';
 import '../../../component/customButtonPrimary.dart';
 import '../../../component/customButtonColor.dart';
 import '../../../component/customDropDown.dart';
 import '../../../component/inputTextField.dart';
 
 class Editpromosi extends StatefulWidget {
-  final Diskon diskon;
-  const Editpromosi({super.key, required this.diskon});
+  final List<Outlets> outletOptions;
+  final Promosi promosi;
+  const Editpromosi(
+      {super.key, required this.promosi, required this.outletOptions});
 
   @override
   State<Editpromosi> createState() => _EditpromosiState();
 }
 
 class _EditpromosiState extends State<Editpromosi> {
+  final Apipromosi _apipromosi = new Apipromosi();
   final numberFormat = NumberFormat('#,##0', 'id');
   final TextEditingController minimalPembeliancontroler =
       TextEditingController();
@@ -48,12 +54,12 @@ class _EditpromosiState extends State<Editpromosi> {
   List<String> aktivasiOptions = ['Otomatis', 'Manual'];
   List<String> tipeDiskonOptions = ['Tipe Potongan (%)', 'Tipe Potongan (Rp)'];
   String? outletSelect;
+  List<Outlets> idOutlet = [];
   List<String> outletOptions = [
     'Semua',
-    'West Coast Coffee',
-    'North Coast Coffee',
-    'East Coast Coffee',
-    'South Coast Coffee'
+  ];
+  List<String> outletsort = [
+    'Semua',
   ];
   List<String> days = [
     "Senin",
@@ -65,7 +71,15 @@ class _EditpromosiState extends State<Editpromosi> {
     "Minggu"
   ];
   List<String> listoutletSelect = [];
-  List<String> daysSelect = [];
+  List<String> daysSelect = [
+    "Senin",
+    "Selasa",
+    "Rabu",
+    "Kamis",
+    "Jumat",
+    "Sabtu",
+    "Minggu"
+  ];
   void _quickAccesForm(BuildContext context) {
     showModalBottomSheet(
       backgroundColor: const Color(0xFFFBFBFB),
@@ -275,7 +289,6 @@ class _EditpromosiState extends State<Editpromosi> {
                               setState(() {
                                 daysSelect = sortDays(daysSelectModal);
                               });
-                              print("Days selected: $daysSelect");
                             },
                             child: const Text(
                               'Simpan',
@@ -351,16 +364,37 @@ class _EditpromosiState extends State<Editpromosi> {
                     child: customButtonPrimary(
                         alignment: Alignment.center,
                         height: 48,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.pop(
-                            context,
-                            {
-                              'message':
-                                  'Promosi ${namecontroler.text} berhasil diubah',
-                              'isDeleted': false,
-                            },
-                          );
+                        onPressed: () async {
+                          await _apipromosi.updatePromosiApi(
+                              nama: namecontroler.text,
+                              description: deskripsicontroler.text,
+                              tipeAktivasi: tipeAktivasiSelect ?? '',
+                              minimalBeli: int.parse(minimalPembeliancontroler
+                                  .text
+                                  .replaceAll(RegExp(r'[^\d]'), '')),
+                              kategori: tipeDiskonSelect == 'Tipe Potongan (%)'
+                                  ? '%'
+                                  : 'Rp',
+                              nilaikategori: int.parse(tipediskoncontroler.text
+                                  .replaceAll(RegExp(r'[^\d]'), '')),
+                              tanggalMulai: tanggalMulaicontroler.text,
+                              tanggalBerakhir: tanggalBerakhircontroler.text,
+                              jamMulai: jamMulaicontroler.text,
+                              jamBerakhir: jamBerakhircontroler.text,
+                              hari: daysSelect,
+                              idOutlet: idOutlet,
+                              promosi: widget.promosi);
+                          if (_apipromosi.statusCode == 201) {
+                            Navigator.pop(context);
+                            Navigator.pop(
+                              context,
+                              {
+                                'message':
+                                    'Promosi ${namecontroler.text} berhasil diganti',
+                                'isDeleted': false,
+                              },
+                            );
+                          } else {}
                         },
                         child: const Text(
                           'Simpan',
@@ -438,52 +472,125 @@ class _EditpromosiState extends State<Editpromosi> {
   }
 
   void outletoptionFunction(List<String> outletOptions,
-      List<String> listoutletSelect, Diskon diskon) {
-    if (diskon.semuaOutlet) {
-      // Jika semuaOutlet bernilai true, masukkan semua outlet dari outletOptions ke listoutletSelect kecuali "Semua"
-      listoutletSelect
-          .addAll(outletOptions.where((outlet) => outlet != 'Semua'));
-      // Kosongkan outletOptions dan hanya menyisakan "Semua"
-      outletOptions.retainWhere((outlet) => outlet == 'Semua');
+      List<String> listoutletSelect, Promosi promosi) {
+    // Pastikan detailOutlet tidak null dan memiliki data
+    if (promosi.detailOutlet != null) {
+      for (var outlet in promosi.detailOutlet!) {
+        // Pastikan outlet.id ada dan outlet.nama tidak null
+        if (outlet.id != null && outlet.nama != null) {
+          // Menambahkan nama outlet ke dalam listoutletSelect jika outlet.id ditemukan
+          listoutletSelect.add(outlet.nama!);
+
+          // Cari outlet yang cocok dari widget.outletOptions menggunakan id
+          Outlets otl = widget.outletOptions
+              .firstWhere((outletOption) => outletOption.idOutlet == outlet.id);
+
+          // Jika outlet ditemukan
+          if (otl != null) {
+            // Masukkan outlet ke dalam idOutlet
+            idOutlet.add(otl);
+
+            // Menghapus outlet dari outletOptions
+            outletOptions.removeWhere(
+                (outletName) => outletName == otl.idOutlet.toString());
+          }
+        }
+      }
+    }
+
+    // Menghapus elemen dari outletOptions yang sudah ada di listoutletSelect
+    outletOptions.removeWhere((outlet) => listoutletSelect.contains(outlet));
+  }
+
+  bool tipeDiskon(Promosi promosi) {
+    if (promosi.kategoriPromosi == 'Rp') {
+      return true;
     } else {
-      // Jika tidak semuaOutlet, hapus elemen dari outletOptions jika ada di listoutletSelect
-      listoutletSelect.addAll(diskon.outlet);
-      outletOptions.removeWhere((outlet) => listoutletSelect.contains(outlet));
+      return false;
     }
   }
 
-  String tipeDiskon(Diskon diskon) {
-    if (diskon.tipeDiskon.toLowerCase() == 'percentage') {
-      print(diskon.tipeDiskon.toLowerCase());
-      return 'Tipe Potongan (%)';
-    } else {
-      return 'Tipe Potongan (Rp)';
-    }
-  }
-
-  String initialTipeDiskonControler(Diskon diskon) {
-    if (diskon.tipeDiskon.toLowerCase() == 'percentage') {
-      int number = diskon.percentage.toInt();
+  String initialTipeDiskonControler(Promosi promosi) {
+    if (promosi.kategoriPromosi == '%') {
+      int number = promosi.nilaiKategori ?? 0;
       return number.toString();
     } else {
       final numberFormat = NumberFormat('#,##0', 'id');
 
-      return numberFormat.format(diskon.nominal);
+      return numberFormat.format(promosi.nilaiKategori);
     }
   }
 
-  String initialTipeAktivasi(Diskon diskon) {
-    if (diskon.tipeAktivation.toLowerCase() == 'otomatis') {
+  String initialTipeAktivasi(Promosi promosi) {
+    if (promosi.tipeAktivasi == 'Otomatis') {
       return 'Otomatis';
     } else {
       return 'Manual';
     }
   }
 
-  String initialTanggalControler(Diskon diskon) {
-    final date = DateFormat('dd MMM yyyy', 'id');
-    print(date.format(diskon.tanggalMulai));
-    return date.format(diskon.tanggalMulai);
+  String initialTanggalMulaiControler(Promosi promosi) {
+    // Memecah string tanggal yang ada di promosi.durasi
+    List<String> splitDates = promosi.durasi!.split(' - ');
+
+    // Membuat DateFormat dengan format yang diinginkan
+    final date = DateFormat('dd MMM yyyy', 'en');
+
+    // Mengonversi splitDates[0] (tanggal awal) ke DateTime
+    DateTime startDate = date.parse(splitDates[0]);
+
+    // Menampilkan tanggal yang sudah diformat
+
+    // Menggunakan tanggal mulai dari diskon
+    return date.format(startDate);
+  }
+
+  String initialTanggalBerakhirControler(Promosi promosi) {
+    // Memecah string tanggal yang ada di promosi.durasi
+    List<String> splitDates = promosi.durasi!.split(' - ');
+
+    // Membuat DateFormat dengan format yang diinginkan
+    final date = DateFormat('dd MMM yyyy', 'en');
+
+    // Mengonversi splitDates[0] (tanggal awal) ke DateTime
+    DateTime startDate = date.parse(splitDates[1]);
+
+    // Menampilkan tanggal yang sudah diformat
+
+    // Menggunakan tanggal mulai dari diskon
+    return date.format(startDate);
+  }
+
+  DateTime initialTanggalBerakhir(Promosi promosi) {
+    // Memecah string tanggal yang ada di promosi.durasi
+    List<String> splitDates = promosi.durasi!.split(' - ');
+
+    // Membuat DateFormat dengan format yang diinginkan
+    final date = DateFormat('dd MMM yyyy', 'en');
+
+    // Mengonversi splitDates[1] (tanggal berakhir) ke DateTime
+    DateTime endDate = date.parse(splitDates[1]);
+
+    // Menampilkan tanggal yang sudah diformat (hanya jika diperlukan untuk debugging)
+
+    // Mengembalikan tanggal berakhir sebagai DateTime
+    return endDate;
+  }
+
+  DateTime initialTanggalMulai(Promosi promosi) {
+    // Memecah string tanggal yang ada di promosi.durasi
+    List<String> splitDates = promosi.durasi!.split(' - ');
+
+    // Membuat DateFormat dengan format yang diinginkan
+    final date = DateFormat('dd MMM yyyy', 'en');
+
+    // Mengonversi splitDates[1] (tanggal berakhir) ke DateTime
+    DateTime endDate = date.parse(splitDates[0]);
+
+    // Menampilkan tanggal yang sudah diformat (hanya jika diperlukan untuk debugging)
+
+    // Mengembalikan tanggal berakhir sebagai DateTime
+    return endDate;
   }
 
   DateTime initialHour(String jam) {
@@ -491,22 +598,35 @@ class _EditpromosiState extends State<Editpromosi> {
     return format.parse(jam);
   }
 
+  Future<void> _readAndPrintOutlet() async {
+    setState(() {
+      for (var element in widget.outletOptions) {
+        outletOptions.add(element.namaOutlet ?? '');
+        outletsort.add(element.namaOutlet ?? '');
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
-    outletoptionFunction(outletOptions, listoutletSelect, widget.diskon);
-    namecontroler.text = widget.diskon.name;
-    deskripsicontroler.text = widget.diskon.deskripsi;
+    _readAndPrintOutlet();
+    outletoptionFunction(outletOptions, listoutletSelect, widget.promosi);
+    namecontroler.text = widget.promosi.namaPromosi ?? '';
+    deskripsicontroler.text = widget.promosi.deskripsiPromosi ?? '';
     length = deskripsicontroler.text.length;
-    tipeDiskonSelect = tipeDiskon(widget.diskon);
-    tipediskoncontroler.text = initialTipeDiskonControler(widget.diskon);
-    tipeAktivasiSelect = initialTipeAktivasi(widget.diskon);
-    tanggalMulaicontroler.text = initialTanggalControler(widget.diskon);
-    tanggalBerakhircontroler.text = initialTanggalControler(widget.diskon);
-    jamMulaicontroler.text = widget.diskon.jamMulai;
-    jamBerakhircontroler.text = widget.diskon.jamBerakhir;
-    daysSelect = widget.diskon.hariPromo;
-    minimalPembeliancontroler.text = widget.diskon.minimalPembelian.toString();
+    tipeDiskonSelect = tipeDiskon(widget.promosi)
+        ? tipeDiskonOptions.last
+        : tipeDiskonOptions.first;
+    tipediskoncontroler.text = initialTipeDiskonControler(widget.promosi);
+    tipeAktivasiSelect = initialTipeAktivasi(widget.promosi);
+    tanggalMulaicontroler.text = initialTanggalMulaiControler(widget.promosi);
+    tanggalBerakhircontroler.text =
+        initialTanggalBerakhirControler(widget.promosi);
+    jamMulaicontroler.text = widget.promosi.jamMulai ?? '00:00:00';
+    jamBerakhircontroler.text = widget.promosi.jamBerakhir ?? '23:59:59';
+    daysSelect = widget.promosi.pilihanHari!;
+    minimalPembeliancontroler.text = widget.promosi.minimalBeli.toString();
     minimalPembeliancontroler.addListener(() {
       String text =
           minimalPembeliancontroler.text.replaceAll(RegExp(r'[^0-9]'), '');
@@ -611,29 +731,44 @@ class _EditpromosiState extends State<Editpromosi> {
                                       Customdropdown(
                                           data: outletOptions,
                                           onChanged: (String? newvalue) {
-                                            if (newvalue?.toLowerCase() ==
-                                                'semua') {
-                                              for (var i = 1;
-                                                  i < outletOptions.length;
-                                                  i++) {
+                                            if (newvalue != null) {
+                                              if (newvalue.toLowerCase() ==
+                                                  'semua') {
+                                                for (var i = 1;
+                                                    i < outletOptions.length;
+                                                    i++) {
+                                                  setState(() {
+                                                    listoutletSelect
+                                                        .add(outletOptions[i]);
+                                                    idOutlet.add(widget
+                                                        .outletOptions[i - 1]);
+                                                  });
+                                                }
+
+                                                setState(() {
+                                                  outletOptions.clear();
+                                                  outletOptions.add('Semua');
+                                                });
+                                                print(
+                                                    'Panjang widget outlet =${idOutlet.length}');
+                                              } else {
                                                 setState(() {
                                                   listoutletSelect
-                                                      .add(outletOptions[i]);
+                                                      .add(newvalue);
+
+                                                  int selectedIndex =
+                                                      outletOptions
+                                                          .indexOf(newvalue);
+                                                  idOutlet.add(
+                                                      widget.outletOptions[
+                                                          selectedIndex - 1]);
+
+                                                  outletOptions
+                                                      .remove(newvalue);
                                                 });
+                                                print(
+                                                    'Panjang widget outlet =${idOutlet.length}');
                                               }
-                                              for (var i = 0;
-                                                  i < listoutletSelect.length;
-                                                  i++) {
-                                                setState(() {
-                                                  outletOptions.remove(
-                                                      listoutletSelect[i]);
-                                                });
-                                              }
-                                            } else {
-                                              setState(() {
-                                                listoutletSelect.add(newvalue!);
-                                                outletOptions.remove(newvalue);
-                                              });
                                             }
                                           },
                                           hintText: 'Pilih Outlet',
@@ -728,13 +863,57 @@ class _EditpromosiState extends State<Editpromosi> {
                                                                       .zero,
                                                               onPressed: () {
                                                                 setState(() {
+                                                                  // Kembalikan outlet yang dihapus ke outletOptions
                                                                   outletOptions.add(
                                                                       listoutletSelect[
                                                                           index]);
+                                                                  outletOptions
+                                                                      .sort((a,
+                                                                          b) {
+                                                                    // Pastikan 'Semua' tetap di atas
+                                                                    if (a ==
+                                                                        'Semua')
+                                                                      return -1;
+                                                                    if (b ==
+                                                                        'Semua')
+                                                                      return 1;
+
+                                                                    // Jika tidak, urutkan berdasarkan urutan yang ada di outletList
+                                                                    int indexA =
+                                                                        outletsort
+                                                                            .indexOf(a);
+                                                                    int indexB =
+                                                                        outletsort
+                                                                            .indexOf(b);
+
+                                                                    // Jika elemen tidak ada di outletList, beri nilai lebih tinggi (terakhir diurutkan)
+                                                                    if (indexA ==
+                                                                        -1)
+                                                                      return 1;
+                                                                    if (indexB ==
+                                                                        -1)
+                                                                      return -1;
+
+                                                                    return indexA
+                                                                        .compareTo(
+                                                                            indexB); // Urutkan berdasarkan urutan di outletList
+                                                                  });
+                                                                  // Hapus outlet dari listoutletSelect
                                                                   listoutletSelect
                                                                       .removeAt(
                                                                           index);
+                                                                  // Kembalikan outlet yang dihapus dari idOutlet (jika perlu)
+                                                                  idOutlet
+                                                                      .removeAt(
+                                                                          index);
+                                                                  if (listoutletSelect
+                                                                      .isEmpty) {
+                                                                    idOutlet
+                                                                        .clear();
+                                                                  }
                                                                 });
+                                                                print(
+                                                                    'Panjang widget outlet =${idOutlet.length}');
                                                               },
                                                               icon: const Icon(
                                                                 size: 13,
@@ -839,7 +1018,7 @@ class _EditpromosiState extends State<Editpromosi> {
                                               });
                                             },
                                             hintText: 'Tipe Potongan',
-                                            heightItem: 40),
+                                            heightItem: 50),
                                         const SizedBox(
                                           width: 8,
                                         ),
@@ -848,7 +1027,7 @@ class _EditpromosiState extends State<Editpromosi> {
                                           alignment: Alignment.centerLeft,
                                           padding: const EdgeInsets.symmetric(
                                               vertical: 4, horizontal: 16),
-                                          height: 40,
+                                          height: 50,
                                           hintText: 'Nilai',
                                           keyboardType: TextInputType.number,
                                           controller: tipediskoncontroler,
@@ -1017,7 +1196,6 @@ class _EditpromosiState extends State<Editpromosi> {
                                           Flexible(
                                             child: FormBuilderDateTimePicker(
                                               onChanged: (value) {
-                                                print(value);
                                                 setState(() {});
                                               },
                                               format: DateFormat(
@@ -1025,8 +1203,8 @@ class _EditpromosiState extends State<Editpromosi> {
                                               name: 'TanggalMulai',
                                               firstDate: DateTime.now(),
                                               controller: tanggalMulaicontroler,
-                                              initialValue:
-                                                  widget.diskon.tanggalMulai,
+                                              initialValue: initialTanggalMulai(
+                                                  widget.promosi),
                                               initialEntryMode:
                                                   DatePickerEntryMode.calendar,
                                               inputType: InputType.date,
@@ -1083,7 +1261,6 @@ class _EditpromosiState extends State<Editpromosi> {
                                           Flexible(
                                             child: FormBuilderDateTimePicker(
                                               onChanged: (value) {
-                                                print(value);
                                                 setState(() {});
                                               },
                                               format: DateFormat(
@@ -1091,7 +1268,8 @@ class _EditpromosiState extends State<Editpromosi> {
                                               name: 'TanggalBerakhir',
                                               firstDate: DateTime.now(),
                                               initialValue:
-                                                  widget.diskon.tanggalBerakhir,
+                                                  initialTanggalBerakhir(
+                                                      widget.promosi),
                                               controller:
                                                   tanggalBerakhircontroler,
                                               initialEntryMode:
@@ -1160,7 +1338,6 @@ class _EditpromosiState extends State<Editpromosi> {
                                           Flexible(
                                             child: FormBuilderDateTimePicker(
                                               onChanged: (value) {
-                                                print(value);
                                                 setState(() {});
                                               },
                                               name: 'JamMulai',
@@ -1173,7 +1350,8 @@ class _EditpromosiState extends State<Editpromosi> {
                                                   DatePickerEntryMode.calendar,
                                               inputType: InputType.time,
                                               initialValue: initialHour(
-                                                  widget.diskon.jamMulai),
+                                                  widget.promosi.jamMulai ??
+                                                      '00:00:00'),
                                               style: const TextStyle(
                                                 color: Color(0xFF101010),
                                                 fontWeight: FontWeight.w500,
@@ -1230,7 +1408,6 @@ class _EditpromosiState extends State<Editpromosi> {
                                           Flexible(
                                             child: FormBuilderDateTimePicker(
                                               onChanged: (value) {
-                                                print(value);
                                                 setState(() {});
                                                 print(
                                                     jamBerakhircontroler.text);
@@ -1240,7 +1417,8 @@ class _EditpromosiState extends State<Editpromosi> {
                                               firstDate: DateTime.now(),
                                               controller: jamBerakhircontroler,
                                               initialValue: initialHour(
-                                                  widget.diskon.jamBerakhir),
+                                                  widget.promosi.jamBerakhir ??
+                                                      '00:00:00'),
                                               initialEntryMode:
                                                   DatePickerEntryMode.input,
                                               inputType: InputType.time,
@@ -1309,15 +1487,20 @@ class _EditpromosiState extends State<Editpromosi> {
                           color: Color(0xFFFFFFFF),
                           borderRadius: BorderRadius.all(Radius.circular(8))),
                       child: CustombuttonColor(
-                          onPressed: () {
-                            Navigator.pop(
-                              context,
-                              {
-                                'message':
-                                    'Promosi ${namecontroler.text} berhasil dihapus',
-                                'isDeleted': true,
-                              },
-                            );
+                          onPressed: () async {
+                            await _apipromosi
+                                .deletePromosi(widget.promosi.idPromosi ?? 0);
+                            if (_apipromosi.statusCode == 204 ||
+                                _apipromosi.statusCode == 200) {
+                              Navigator.pop(
+                                context,
+                                {
+                                  'message':
+                                      'Promosi ${namecontroler.text} berhasil dihapus',
+                                  'isDeleted': true,
+                                },
+                              );
+                            } else {}
                           },
                           color: const Color(0xFFFFFFFF),
                           alignment: Alignment.center,
@@ -1372,13 +1555,9 @@ class _EditpromosiState extends State<Editpromosi> {
                           alignment: Alignment.center,
                           height: 48,
                           onPressed: () {
-                            print('data berhasil masuk');
                             if (validateForm()) {
-                              print('data berhasil masuk');
                               _confirmModal(context, namecontroler.text);
-                            } else {
-                              print('Isi data');
-                            }
+                            } else {}
                           },
                           child: const Text(
                             'Simpan',

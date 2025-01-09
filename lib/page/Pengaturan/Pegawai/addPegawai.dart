@@ -6,9 +6,11 @@ import 'package:flutter_svg/svg.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:salescheck/Service/ApiPegawai.dart';
 import 'package:salescheck/component/customButtonColor.dart';
 import 'package:salescheck/component/customDropDown.dart';
 import 'package:salescheck/component/inputTextField.dart';
+import 'package:salescheck/component/notifError.dart';
 
 import '../../../component/customButtonPrimary.dart';
 
@@ -20,49 +22,50 @@ class Addpegawai extends StatefulWidget {
 }
 
 class _AddpegawaiState extends State<Addpegawai> {
+  final Apipegawai _apipegawai = new Apipegawai();
   File? _image;
   bool permissionGalery = false;
   bool info = true;
   int stepindex = 1;
-  List<String> step = [
-    'Detail cabang',
-    'Pilih koordinator cabang',
-    'Tambah Produk'
-  ];
-  final TextEditingController namecontroler = TextEditingController();
 
+  final TextEditingController namecontroler = TextEditingController();
   final TextEditingController emailcontroler = TextEditingController();
+  final TextEditingController passwordcontroler = TextEditingController();
   final TextEditingController searchcontroler = TextEditingController();
   final ScrollController _scrollController = new ScrollController();
   final _formKey = GlobalKey<FormState>();
   bool focusname = false;
+  bool focuspassword = false;
 
   bool focusemail = false;
   String? selectRole;
   String selectActive = 'Aktif';
   FocusNode _focusNodeName = FocusNode();
   FocusNode _focusNodeemail = FocusNode();
+  FocusNode _focusNodepassword = FocusNode();
 
-  List<String> roleOptions = ['Admin', 'Manajer', 'Kasir', 'Hr', 'Staff'];
+  List<String> roleOptions = [
+    'Admin',
+    'Manajer',
+    'Kasir',
+  ];
   List<String> activeOptions = ['Aktif', 'Nonaktif'];
 
   Future<void> _requestPermission() async {
     PermissionStatus status = await Permission.manageExternalStorage.status;
-    print('Memnita permission');
+
     if (status.isDenied || status.isPermanentlyDenied) {
       await Permission.manageExternalStorage.request();
-      print('Ditolak permission');
+
       // _showPermissionDialog(); // Tampilkan Alert Dialog jika izin ditolak
       setState(() {
         permissionGalery = false;
       });
     } else if (status.isGranted) {
-      print('Diterima permission');
       setState(() {
         permissionGalery = true;
       });
     } else {
-      print('Memnita ulang permission');
       await Permission.photos.request(); // Meminta izin
       if (await Permission.photos.isGranted) {
         _pickImage(); // Lanjutkan jika izin diberikan setelah diminta
@@ -153,6 +156,11 @@ class _AddpegawaiState extends State<Addpegawai> {
         focusemail = _focusNodeemail.hasFocus;
       });
     });
+    _focusNodepassword.addListener(() {
+      setState(() {
+        focuspassword = _focusNodepassword.hasFocus;
+      });
+    });
   }
 
   @override
@@ -161,11 +169,12 @@ class _AddpegawaiState extends State<Addpegawai> {
     super.dispose();
     _focusNodeName.dispose();
     _focusNodeemail.dispose();
+    _focusNodepassword.dispose();
   }
 
   bool validForm() {
     final form = _formKey.currentState;
-    if (form != null && form.validate() && _image != null) {
+    if (form != null && form.validate()) {
       return true;
     } else {
       return false;
@@ -175,7 +184,7 @@ class _AddpegawaiState extends State<Addpegawai> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       backgroundColor: const Color(0xFFF6F8FA),
       appBar: AppBar(
         backgroundColor: const Color(0xFFF6F8FA),
@@ -370,6 +379,13 @@ class _AddpegawaiState extends State<Addpegawai> {
                                       controller: emailcontroler,
                                       focus: _focusNodeemail,
                                     ),
+                                    labelForm('Password'),
+                                    Inputtextfield(
+                                      hintText: 'Masukkan Password',
+                                      keyboardType: TextInputType.text,
+                                      controller: passwordcontroler,
+                                      focus: _focusNodepassword,
+                                    ),
                                     labelForm('Role'),
                                     Customdropdown(
                                         selectValue: selectRole,
@@ -434,9 +450,27 @@ class _AddpegawaiState extends State<Addpegawai> {
                       child: customButtonPrimary(
                           alignment: Alignment.center,
                           height: 48,
-                          onPressed: () {
-                            Navigator.pop(
-                                context, 'Berhasil Menambahkan Pegawai baru');
+                          onPressed: () async {
+                            if (validForm()) {
+                              await _apipegawai.addPegawaiApi(
+                                  nama: namecontroler.text,
+                                  email: emailcontroler.text,
+                                  password: passwordcontroler.text,
+                                  role: selectRole ?? '',
+                                  status: selectActive == 'Aktif'
+                                      ? 'Active'
+                                      : 'Inactive',
+                                  image: _image);
+                              if (_apipegawai.statusCode == 200 ||
+                                  _apipegawai.statusCode == 201) {
+                                Navigator.pop(context,
+                                    'Berhasil Menambahkan Pegawai baru');
+                              } else {
+                                Notiferror.showNotif(
+                                    context: context,
+                                    description: _apipegawai.message);
+                              }
+                            }
                           },
                           child: const Text(
                             'Simpan',

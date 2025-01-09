@@ -7,17 +7,29 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 
 import 'package:intl/intl.dart';
+import 'package:salescheck/component/customDropDown.dart';
+import 'package:salescheck/page/Login/loginform.dart';
 
+import '../../Service/Api.dart';
+import '../../component/customButtonPrimary.dart';
 import '../landingPage/landingPage.dart';
 
 class Signupformklien extends StatefulWidget {
-  const Signupformklien({super.key});
+  final String email;
+  final String password;
+  final String role;
+  const Signupformklien(
+      {super.key,
+      required this.email,
+      required this.password,
+      required this.role});
 
   @override
   State<Signupformklien> createState() => _SignupformklienState();
 }
 
 class _SignupformklienState extends State<Signupformklien> {
+  final Api _api = Api();
   final TextEditingController namecontroler = TextEditingController();
   final TextEditingController tanggalcontroler = TextEditingController();
   final TextEditingController kelamincontroler = TextEditingController();
@@ -236,7 +248,6 @@ class _SignupformklienState extends State<Signupformklien> {
                                                   child:
                                                       FormBuilderDateTimePicker(
                                                     onChanged: (value) {
-                                                      print(value);
                                                       setState(() {});
                                                     },
                                                     format: DateFormat(
@@ -294,120 +305,40 @@ class _SignupformklienState extends State<Signupformklien> {
                                           ],
                                         )),
                                     labelForm('Jenis Kelamin'),
-                                    Container(
-                                        // height: 72,
-                                        padding:
-                                            const EdgeInsets.only(right: 0),
-                                        decoration: BoxDecoration(
-                                            color: const Color(0xFFF6F6F6),
-                                            border: Border.all(
-                                                width: 0,
-                                                color: const Color(0xFFF6F6F6)),
-                                            borderRadius:
-                                                BorderRadius.circular(8)),
-                                        child: Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.start,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            Expanded(
-                                              child: Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        vertical: 0,
-                                                        horizontal: 16),
-                                                child:
-                                                    DropdownButtonHideUnderline(
-                                                  child:
-                                                      DropdownButton2<String>(
-                                                    iconStyleData: IconStyleData(
-                                                        icon: SvgPicture.asset(
-                                                            'asset/image/arrow-down.svg')),
-                                                    isExpanded: true,
-                                                    hint: const Text(
-                                                      'Pilih Jenis Kelamin',
-                                                      style: TextStyle(
-                                                          fontSize: 14,
-                                                          fontWeight:
-                                                              FontWeight.w500,
-                                                          color: Color(
-                                                              0xFFA8A8A8)),
-                                                    ),
-                                                    items: genderOptions
-                                                        .map((String item) =>
-                                                            DropdownMenuItem<
-                                                                String>(
-                                                              value: item,
-                                                              child: Text(
-                                                                item,
-                                                                style: const TextStyle(
-                                                                    fontSize:
-                                                                        14,
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .w500,
-                                                                    color: Color(
-                                                                        0xFF101010)),
-                                                              ),
-                                                            ))
-                                                        .toList(),
-                                                    value: selectedValue,
-                                                    onChanged: (String? value) {
-                                                      setState(() {
-                                                        selectedValue = value;
-                                                      });
-                                                    },
-                                                    buttonStyleData:
-                                                        const ButtonStyleData(
-                                                      padding:
-                                                          EdgeInsets.symmetric(
-                                                              horizontal: 0),
-                                                      height: 40,
-                                                      width: 50,
-                                                    ),
-                                                    menuItemStyleData:
-                                                        const MenuItemStyleData(
-                                                      height: 30,
-                                                    ),
-                                                    dropdownStyleData:
-                                                        const DropdownStyleData(
-                                                            maxHeight: 200,
-                                                            useSafeArea: true,
-                                                            decoration:
-                                                                BoxDecoration(
-                                                                    color: Colors
-                                                                        .white)),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        )),
+                                    Customdropdown(
+                                        selectValue: selectedValue,
+                                        data: genderOptions,
+                                        onChanged: (p0) {
+                                          setState(() {
+                                            selectedValue = p0;
+                                          });
+                                        },
+                                        hintText: 'Pilih jenis kelamin',
+                                        heightItem: 50),
                                     const SizedBox(
                                       height: 32,
                                     ),
-                                    ElevatedButton(
-                                        onPressed: () {
-                                          Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      const Landingpage()));
+                                    customButtonPrimary(
+                                        height: 50,
+                                        width: double.infinity,
+                                        alignment: Alignment.center,
+                                        onPressed: () async {
+                                          await _api.signup(
+                                              namecontroler.text,
+                                              widget.email,
+                                              widget.password,
+                                              widget.role);
+                                          Navigator.of(context).pushReplacement(
+                                            MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const Loginform()),
+                                          );
                                         },
-                                        style: ElevatedButton.styleFrom(
-                                            shape: const RoundedRectangleBorder(
-                                                borderRadius: BorderRadius.all(
-                                                    Radius.circular(12))),
-                                            backgroundColor:
-                                                const Color(0xFF0747CB),
-                                            minimumSize: const Size(
-                                                double.infinity, 50)),
                                         child: const Text(
                                           'Buat akun',
                                           style: TextStyle(
-                                              fontSize: 18,
                                               fontWeight: FontWeight.w600,
+                                              fontSize: 16,
                                               color: Color(0xFFFFFFFF)),
                                         )),
                                   ],

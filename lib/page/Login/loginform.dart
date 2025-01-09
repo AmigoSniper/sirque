@@ -3,8 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:salescheck/Service/Api.dart';
+import 'package:salescheck/component/customButtonPrimary.dart';
+import 'package:salescheck/component/inputTextField.dart';
+import 'package:salescheck/component/notifError.dart';
+import 'package:salescheck/component/notifSucces.dart';
 import 'package:salescheck/page/Signup/signupform.dart';
 import 'package:salescheck/page/landingPage/landingPage.dart';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 class Loginform extends StatefulWidget {
   const Loginform({super.key});
@@ -14,25 +22,31 @@ class Loginform extends StatefulWidget {
 }
 
 class _LoginformState extends State<Loginform> {
+  final Api _api = Api();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-  final TextEditingController numbercontroller = TextEditingController();
+  final TextEditingController emailcontroller = TextEditingController();
   final TextEditingController passwordcontroler = TextEditingController();
+  final TextEditingController tokencontroler = TextEditingController();
   String initialCountry = 'ID';
   String? countryCode;
-  bool focusnumber = false;
+  bool focusemail = false;
   bool focuspass = false;
+  bool focustoken = false;
   bool passSecure = true;
+  bool tokenSecure = true;
   bool rememberMe = false;
-  FocusNode _focusNodeNumber = FocusNode();
+  FocusNode _focusNodeemail = FocusNode();
   FocusNode _focusNodePass = FocusNode();
-
+  FocusNode _focusNodeToken = FocusNode();
+  bool isSelectTab1 = true;
+  bool isSelectTab2 = false;
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    _focusNodeNumber.addListener(() {
+    _focusNodeemail.addListener(() {
       setState(() {
-        focusnumber = _focusNodeNumber.hasFocus;
+        focusemail = _focusNodeemail.hasFocus;
       });
     });
     _focusNodePass.addListener(() {
@@ -40,15 +54,68 @@ class _LoginformState extends State<Loginform> {
         focuspass = _focusNodePass.hasFocus;
       });
     });
+    _focusNodeToken.addListener(() {
+      setState(() {
+        focustoken = _focusNodeToken.hasFocus;
+      });
+    });
+  }
+
+  Widget TabButton(BuildContext context, String textTitle, bool isSelected) {
+    return Expanded(
+      child: Container(
+        height: 31,
+        decoration: BoxDecoration(
+            // boxShadow: [
+            //   BoxShadow(
+            //     color: isSelected
+            //         ? Colors.black.withOpacity(0.2)
+            //         : Colors.transparent,
+            //     spreadRadius: -1,
+            //     blurRadius: 2.7,
+            //     offset: const Offset(2, 2),
+            //   ),
+            // ],
+            color: isSelected ? const Color(0xFFFFFFFF) : Colors.transparent,
+            borderRadius: BorderRadius.circular(10)),
+        child: ElevatedButton(
+            onPressed: isSelected
+                ? null
+                : () {
+                    setState(() {
+                      if (isSelectTab1 == true) {
+                        isSelectTab1 = false;
+                        isSelectTab2 = true;
+                      } else if (isSelectTab1 == false) {
+                        isSelectTab1 = true;
+                        isSelectTab2 = false;
+                      }
+                    });
+                  },
+            style: ButtonStyle(
+                backgroundColor: isSelected
+                    ? WidgetStateProperty.all(const Color(0xFFFFFFFF))
+                    : WidgetStateProperty.all(Colors.transparent),
+                shadowColor: WidgetStateProperty.all(Colors.transparent),
+                overlayColor: WidgetStateProperty.all(Colors.transparent)),
+            child: Center(
+              child: Text(textTitle,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      color: Color(0xFF333333))),
+            )),
+      ),
+    );
   }
 
   @override
   void dispose() {
     // TODO: implement dispose
     super.dispose();
-    _focusNodeNumber.dispose();
+    _focusNodeemail.dispose();
     _focusNodePass.dispose();
-    super.dispose();
+    _focusNodeToken.dispose();
   }
 
   @override
@@ -139,213 +206,320 @@ class _LoginformState extends State<Loginform> {
                           mainAxisAlignment: MainAxisAlignment.start,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Padding(
-                              padding: EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                'No. Handphone',
-                                style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF979899)),
-                              ),
-                            ),
-                            Container(
-                                // height: 72,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 0, vertical: 0),
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                height: 39,
+                                width: 360,
                                 decoration: BoxDecoration(
                                     color: const Color(0xFFF6F6F6),
-                                    border: focusnumber
-                                        ? Border.all(
-                                            width: 1,
-                                            color: const Color(0xFF101010))
-                                        : Border.all(
-                                            width: 0,
-                                            color: const Color(0xFFF6F6F6)),
-                                    borderRadius: BorderRadius.circular(8)),
+                                    borderRadius: BorderRadius.circular(10)),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisSize: MainAxisSize.max,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(0),
-                                      decoration: const BoxDecoration(
-                                          border: Border(
-                                              right: BorderSide(width: 0.1))),
-                                      child: Row(
-                                        children: [
-                                          CountryCodePicker(
-                                            onInit: (value) {
-                                              countryCode = value?.dialCode;
-                                            },
-                                            flagWidth: 16,
-                                            padding: const EdgeInsets.only(
-                                                right: 4,
-                                                left: 4,
-                                                top: 7,
-                                                bottom: 7),
-                                            showFlag: true,
-                                            showDropDownButton: true,
-                                            initialSelection: initialCountry,
-                                            textStyle: const TextStyle(
-                                                color: Color(0xff333333),
-                                                fontSize: 14,
-                                                fontWeight: FontWeight.w500),
-                                            onChanged: (value) {
-                                              setState(() {
-                                                countryCode = value.dialCode;
-                                              });
-                                            },
-                                          ),
-                                        ],
-                                      ),
+                                    TabButton(context, 'Email', isSelectTab1),
+                                    const SizedBox(
+                                      width: 8,
                                     ),
-                                    Expanded(
-                                        child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 16),
-                                      width: double.infinity,
-                                      child: TextField(
-                                        keyboardType: TextInputType.phone,
-                                        controller: numbercontroller,
-                                        focusNode: _focusNodeNumber,
-                                        style: const TextStyle(
-                                            color: Color(0xFF101010),
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 14),
-                                        decoration: const InputDecoration(
-                                            hintText: 'Nomor Telepon Anda',
-                                            hintStyle: TextStyle(
-                                                color: Color(0xFF979899),
-                                                fontWeight: FontWeight.w500,
-                                                fontSize: 14),
-                                            border: InputBorder.none),
-                                      ),
-                                    ))
+                                    TabButton(context, 'ID-Token', isSelectTab2)
                                   ],
-                                )),
-                            Padding(
-                              padding:
-                                  const EdgeInsets.only(top: 16, bottom: 8),
-                              child: Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'kata Sandi',
-                                    style: TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                        color: Color(0xFF979899)),
-                                  ),
-                                  TextButton(
-                                      onPressed: () {},
-                                      style: ButtonStyle(
-                                          padding: WidgetStateProperty.all<
-                                              EdgeInsets>(EdgeInsets.zero),
-                                          minimumSize: WidgetStateProperty.all(
-                                              const Size(0, 0)),
-                                          tapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                          overlayColor: WidgetStateProperty.all(
-                                              Colors.transparent)),
-                                      child: const Text(
-                                        'Lupa Password ?',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w500,
-                                            fontSize: 14,
-                                            color: Color(0xFF2E6CE9)),
-                                      ))
-                                ],
+                                ),
                               ),
                             ),
-                            Container(
-                                // height: 72,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 0, vertical: 0),
-                                decoration: BoxDecoration(
-                                    color: const Color(0xFFF6F6F6),
-                                    border: focuspass
-                                        ? Border.all(
-                                            width: 1,
-                                            color: const Color(0xFF101010))
-                                        : Border.all(
-                                            width: 0,
-                                            color: const Color(0xFFF6F6F6)),
-                                    borderRadius: BorderRadius.circular(8)),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        alignment: Alignment.center,
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 16),
-                                        child: TextField(
-                                          keyboardType: TextInputType.text,
-                                          controller: passwordcontroler,
-                                          focusNode: _focusNodePass,
-                                          obscureText: passSecure,
-                                          obscuringCharacter: '*',
-                                          style: const TextStyle(
-                                              color: Color(0xFF101010),
+                            const SizedBox(
+                              height: 24,
+                            ),
+                            isSelectTab1 == true
+                                ? Column(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Padding(
+                                        padding: EdgeInsets.only(bottom: 8),
+                                        child: Text(
+                                          'Email',
+                                          style: TextStyle(
+                                              fontSize: 14,
                                               fontWeight: FontWeight.w500,
-                                              fontSize: 14),
-                                          decoration: const InputDecoration(
-                                              hintText: 'Tulis Password',
-                                              hintStyle: const TextStyle(
-                                                  color: Color(0xFF979899),
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 14),
-                                              border: InputBorder.none),
+                                              color: Color(0xFF979899)),
                                         ),
                                       ),
-                                    ),
-                                    IconButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            passSecure = !passSecure;
-                                          });
-                                        },
-                                        icon: Icon(
-                                          passSecure
-                                              ? Icons.visibility_off
-                                              : Icons.visibility,
-                                          color: passSecure
-                                              ? const Color(0xFFACB5BB)
-                                              : const Color(0xFF101010),
-                                          size: 16,
-                                        )),
-                                  ],
-                                )),
+                                      Container(
+                                          decoration: BoxDecoration(
+                                              color: const Color(0xFFF6F6F6),
+                                              border: focusemail
+                                                  ? Border.all(
+                                                      width: 1,
+                                                      color: const Color(
+                                                          0xFF101010))
+                                                  : Border.all(
+                                                      width: 0,
+                                                      color: const Color(
+                                                          0xFFF6F6F6)),
+                                              borderRadius:
+                                                  BorderRadius.circular(8)),
+                                          child: Inputtextfield(
+                                            keyboardType:
+                                                TextInputType.emailAddress,
+                                            controller: emailcontroller,
+                                            focus: _focusNodeemail,
+                                            hintText: 'Nomor Email Anda',
+                                          )),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                            top: 16, bottom: 8),
+                                        child: Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'kata Sandi',
+                                              style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: Color(0xFF979899)),
+                                            ),
+                                            TextButton(
+                                                onPressed: () {},
+                                                style: ButtonStyle(
+                                                    padding: WidgetStateProperty
+                                                        .all<EdgeInsets>(
+                                                            EdgeInsets.zero),
+                                                    minimumSize:
+                                                        WidgetStateProperty.all(
+                                                            const Size(0, 0)),
+                                                    tapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                    overlayColor:
+                                                        WidgetStateProperty.all(
+                                                            Colors
+                                                                .transparent)),
+                                                child: const Text(
+                                                  'Lupa Password ?',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w500,
+                                                      fontSize: 14,
+                                                      color: Color(0xFF2E6CE9)),
+                                                ))
+                                          ],
+                                        ),
+                                      ),
+                                      Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 0, vertical: 0),
+                                          decoration: BoxDecoration(
+                                              color: const Color(0xFFF6F6F6),
+                                              border: focuspass
+                                                  ? Border.all(
+                                                      width: 1,
+                                                      color: const Color(
+                                                          0xFF101010))
+                                                  : Border.all(
+                                                      width: 0,
+                                                      color: const Color(
+                                                          0xFFF6F6F6)),
+                                              borderRadius:
+                                                  BorderRadius.circular(8)),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child: Container(
+                                                    alignment: Alignment.center,
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            right: 16),
+                                                    child: Inputtextfield(
+                                                      controller:
+                                                          passwordcontroler,
+                                                      focus: _focusNodePass,
+                                                      password: passSecure,
+                                                      keyboardType:
+                                                          TextInputType.text,
+                                                    )),
+                                              ),
+                                              IconButton(
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      passSecure = !passSecure;
+                                                    });
+                                                  },
+                                                  icon: Icon(
+                                                    passSecure
+                                                        ? Icons.visibility_off
+                                                        : Icons.visibility,
+                                                    color: passSecure
+                                                        ? const Color(
+                                                            0xFFACB5BB)
+                                                        : const Color(
+                                                            0xFF101010),
+                                                    size: 16,
+                                                  )),
+                                            ],
+                                          )),
+                                    ],
+                                  )
+                                : Column(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Padding(
+                                        padding:
+                                            EdgeInsets.only(top: 8, bottom: 8),
+                                        child: Text(
+                                          'ID Token',
+                                          style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500,
+                                              color: Color(0xFF979899)),
+                                        ),
+                                      ),
+                                      Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 0, vertical: 0),
+                                          decoration: BoxDecoration(
+                                              color: const Color(0xFFF6F6F6),
+                                              border: focustoken
+                                                  ? Border.all(
+                                                      width: 1,
+                                                      color: const Color(
+                                                          0xFF101010))
+                                                  : Border.all(
+                                                      width: 0,
+                                                      color: const Color(
+                                                          0xFFF6F6F6)),
+                                              borderRadius:
+                                                  BorderRadius.circular(8)),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.center,
+                                            children: [
+                                              Expanded(
+                                                child: Container(
+                                                    alignment: Alignment.center,
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                            right: 16),
+                                                    child: Inputtextfield(
+                                                      controller:
+                                                          tokencontroler,
+                                                      focus: _focusNodeToken,
+                                                      password: tokenSecure,
+                                                      maxLength: 20,
+                                                      hintText:
+                                                          'Masukkan 16 digit token',
+                                                      keyboardType:
+                                                          TextInputType.text,
+                                                    )),
+                                              ),
+                                              IconButton(
+                                                  style: IconButton.styleFrom(
+                                                    iconSize: 16,
+                                                    tapTargetSize:
+                                                        MaterialTapTargetSize
+                                                            .shrinkWrap,
+                                                  ),
+                                                  padding: EdgeInsets.zero,
+                                                  onPressed: () {
+                                                    setState(() {
+                                                      tokenSecure =
+                                                          !tokenSecure;
+                                                    });
+                                                  },
+                                                  icon: Icon(
+                                                    tokenSecure
+                                                        ? Icons.visibility_off
+                                                        : Icons.visibility,
+                                                    color: tokenSecure
+                                                        ? const Color(
+                                                            0xFFACB5BB)
+                                                        : const Color(
+                                                            0xFF101010),
+                                                    size: 16,
+                                                  )),
+                                            ],
+                                          )),
+                                    ],
+                                  ),
                             const SizedBox(
                               height: 16,
                             ),
-                            ElevatedButton(
-                                onPressed: () {
-                                  String nomerhp =
-                                      countryCode! + numbercontroller.text;
-                                  print(nomerhp);
-                                  Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                          builder: (context) =>
-                                              const Landingpage()));
+                            customButtonPrimary(
+                                height: 50,
+                                width: double.infinity,
+                                alignment: Alignment.center,
+                                onPressed: () async {
+                                  if (isSelectTab1 == true) {
+                                    await _api.loginwithEmail(
+                                        emailcontroller.text,
+                                        passwordcontroler.text);
+
+                                    if (_api.statusCode == 200) {
+                                      Notifsucces.showNotif(
+                                          context: context,
+                                          description: _api.message);
+
+                                      Future.delayed(const Duration(seconds: 3),
+                                          () {
+                                        Navigator.pushAndRemoveUntil(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const Landingpage(),
+                                          ),
+                                          (Route<dynamic> route) => false,
+                                        );
+                                      });
+                                    } else {
+                                      Notiferror.showNotif(
+                                          context: context,
+                                          description: _api.message);
+                                    }
+                                  } else {
+                                    await _api
+                                        .loginwithToken(tokencontroler.text);
+
+                                    if (_api.statusCode == 200) {
+                                      Notifsucces.showNotif(
+                                          context: context,
+                                          description: _api.message);
+
+                                      Future.delayed(const Duration(seconds: 3),
+                                          () {
+                                        Navigator.pushAndRemoveUntil(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const Landingpage(),
+                                          ),
+                                          (Route<dynamic> route) => false,
+                                        );
+                                      });
+                                    } else {
+                                      Notiferror.showNotif(
+                                          context: context,
+                                          description: _api.message);
+                                    }
+                                  }
                                 },
-                                style: ElevatedButton.styleFrom(
-                                    shape: const RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.all(
-                                            Radius.circular(12))),
-                                    backgroundColor: const Color(0xFF0747CB),
-                                    minimumSize:
-                                        const Size(double.infinity, 50)),
                                 child: const Text(
-                                  'Masuk',
+                                  'Mulai',
                                   style: TextStyle(
-                                      fontSize: 16,
                                       fontWeight: FontWeight.w600,
+                                      fontSize: 16,
                                       color: Color(0xFFFFFFFF)),
                                 )),
                             const SizedBox(
@@ -369,7 +543,6 @@ class _LoginformState extends State<Loginform> {
                                         ),
                                         recognizer: TapGestureRecognizer()
                                           ..onTap = () {
-                                            print("Teken");
                                             Navigator.push(
                                                 context,
                                                 MaterialPageRoute(

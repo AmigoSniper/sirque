@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dotted_line/dotted_line.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/foundation.dart';
@@ -7,16 +10,43 @@ import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:gradient_borders/gradient_borders.dart';
+import 'package:salescheck/Service/ApiTransaksi.dart';
+import 'package:salescheck/component/notifError.dart';
+import 'package:salescheck/page/Transaksi/buktiPembayaran.dart';
 import 'package:salescheck/page/landingPage/homepage.dart';
 import 'package:salescheck/page/landingPage/landingPage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../Model/RekeningModel.dart';
+import '../../Model/biayaTambahanModel.dart';
+import '../../Model/eWalletModel.dart';
+import '../../Model/promosi.dart';
+import '../../Model/selectedProduct.dart';
+import '../../Service/ApiEwallet.dart';
+import '../../Service/ApiRekening.dart';
 import '../../component/customButtonPrimary.dart';
 
 class Pembayarantransaksi extends StatefulWidget {
-  final String? name;
-  final double PriceTotal;
+  final int idOutlet;
+  final String name;
+  final double totalAmount;
+  final double totalPajak;
+  final double totalOperasional;
+  final double finalAmount;
+  final List<Promosi> listpromosiselected;
+  final List<SelectedProduct> selectedProducts;
+  final List<biayaTambahanModel> biaya;
   const Pembayarantransaksi(
-      {super.key, required this.PriceTotal, required this.name});
+      {super.key,
+      required this.finalAmount,
+      required this.name,
+      required this.idOutlet,
+      required this.totalAmount,
+      required this.listpromosiselected,
+      required this.totalPajak,
+      required this.totalOperasional,
+      required this.selectedProducts,
+      required this.biaya});
 
   @override
   State<Pembayarantransaksi> createState() => _PembayarantransaksiState();
@@ -24,6 +54,10 @@ class Pembayarantransaksi extends StatefulWidget {
 
 class _PembayarantransaksiState extends State<Pembayarantransaksi>
     with TickerProviderStateMixin {
+  final Apitransaksi _apitransaksi = Apitransaksi();
+  final Apirekening _apirekening = Apirekening();
+  final Apiewallet _apiewallet = Apiewallet();
+  late Future<void> _loadDataFuture;
   final numberFormat =
       NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
   final kembalianFormat = NumberFormat('#,##0', 'id');
@@ -34,53 +68,49 @@ class _PembayarantransaksiState extends State<Pembayarantransaksi>
   FocusNode _focusNodekembalian = FocusNode();
   int? tabindex;
   bool focusKembalian = false;
-  List<int> nominal = [50000, 100000, 150000, 200000];
+  List<int> nominal = [50000, 100000, 150000, 200000, 500000, 1000000];
   int bankIndex = 0;
-  final List<String> jenisEWallet = [
-    'Qris-BCA',
-    'Qris-BRI',
-    'Ovo',
-    'Gopay',
-    'Dana',
-  ];
-  final List<String> jenisBank = [
-    'BCA',
-    'BRI',
-    'Mandiri',
-  ];
 
-  final List<String> logoBank = [
-    'asset/banklogo/bca.png',
-    'asset/banklogo/bri.png',
-    'asset/banklogo/mandiri.png'
-  ];
-  final List<String> Bank = [
-    'Bank Central Asia',
-    'Bank Rakyat Indonesia',
-    'Bank Mandiri'
-  ];
-  final List<String> rekBank = [
-    '1234 1234 1234',
-    '5678 5678 5678',
-    '9012 9012 9012'
-  ];
-  String? selectedValueEWallet;
-  String? selectedValueBank;
+  List<Ewalletmodel> eWalletlist = [];
+
+  List<Rekeningmodel> listRekening = [];
+
+  Ewalletmodel? selectedValueEWallet;
+  Rekeningmodel? selectedValueBank;
+  Future<void> getPembayaran() async {
+    eWalletlist = await _apiewallet.getEwallet();
+    if (_apiewallet.statusCode == 200 || _apiewallet.statusCode == 201) {
+      setState(() {
+        eWalletlist = eWalletlist;
+      });
+    }
+    listRekening = await _apirekening.getRekening();
+    if (_apirekening.statusCode == 200 || _apirekening.statusCode == 201) {
+      setState(() {
+        listRekening = listRekening;
+      });
+    }
+    setState(() {
+      if (eWalletlist.isNotEmpty) {
+        selectedValueEWallet = eWalletlist.first;
+      }
+      if (listRekening.isNotEmpty) {
+        selectedValueBank = listRekening.first;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    _loadDataFuture = getPembayaran();
     _tabController = TabController(length: 3, vsync: this);
     tabindex = _tabController.index;
-    print(_tabController.index);
-    print(_tabController.length);
-    selectedValueEWallet = jenisEWallet.first;
-    selectedValueBank = jenisBank.first;
-    bankIndex = jenisBank.indexOf(jenisBank.first);
+
     _tabController.addListener(() {
       setState(() {
         // Perbarui index saat tab berubah
         tabindex = _tabController.index;
-        print('Tab index sekarang: $tabindex');
       });
     });
 
@@ -110,7 +140,7 @@ class _PembayarantransaksiState extends State<Pembayarantransaksi>
 
   double _getContainerHeight() {
     if (tabindex == 0) {
-      return 275;
+      return 335;
     } else if (tabindex == 1) {
       return 500;
     } else if (tabindex == 2) {
@@ -120,10 +150,16 @@ class _PembayarantransaksiState extends State<Pembayarantransaksi>
     }
   }
 
-  void pushHomepage() {
+  void pushHomepage(
+      int idTransaksi, int idOutlet, String metodePembayaran, int kembalian) {
     Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const Landingpage()),
+      MaterialPageRoute(
+          builder: (context) => Buktipembayaran(
+              idTransaksi: idTransaksi,
+              metodePembayaran: metodePembayaran,
+              totalKembalian: kembalian,
+              idOutlet: idOutlet)),
       (Route<dynamic> route) => false,
     );
   }
@@ -240,7 +276,7 @@ class _PembayarantransaksiState extends State<Pembayarantransaksi>
                               height: 8,
                             ),
                             Text(
-                              numberFormat.format(widget.PriceTotal),
+                              numberFormat.format(widget.finalAmount),
                               style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -256,657 +292,879 @@ class _PembayarantransaksiState extends State<Pembayarantransaksi>
                   height: 8,
                 ),
                 Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: const BoxDecoration(
-                      color: Color(0xFFFFFFFF),
-                      borderRadius: BorderRadius.all(Radius.circular(10))),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      TabBar(
-                        isScrollable: false,
-                        controller: _tabController,
-                        dividerColor: const Color(0xFFEBEBED),
-                        dividerHeight: 1,
-                        labelColor: const Color(0xFF303030),
-                        unselectedLabelColor: const Color(0xFFB1B5C0),
-                        indicatorColor: const Color(0xFF303030),
-                        indicatorWeight: 1,
-                        indicatorSize: TabBarIndicatorSize.tab,
-                        labelStyle: const TextStyle(
-                          fontWeight: FontWeight.w500,
-                          fontSize: 14,
-                        ),
-                        tabs: const <Widget>[
-                          Tab(text: 'Tunai'),
-                          Tab(text: 'e-Wallet'),
-                          Tab(text: 'Transfer'),
-                        ],
-                      ),
-                      const SizedBox(
-                        height: 16,
-                      ),
-                      Container(
-                          height: _getContainerHeight(),
-                          child: TabBarView(
-                            physics: const NeverScrollableScrollPhysics(),
-                            controller: _tabController,
-                            children: [
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(
+                        color: Color(0xFFFFFFFF),
+                        borderRadius: BorderRadius.all(Radius.circular(10))),
+                    child: FutureBuilder(
+                      future: _loadDataFuture,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                            child: CircularProgressIndicator(),
+                          );
+                        } else if (snapshot.hasError) {
+                          return Container(
+                              alignment: Alignment.center,
+                              height: 375,
+                              width: 375,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.max,
+                                children: [
+                                  SvgPicture.asset(
+                                    'asset/pegawai/Group 33979.svg',
+                                    width: 105,
+                                    height: 105,
+                                  ),
+                                  const SizedBox(
+                                    height: 12,
+                                  ),
+                                  const Text(
+                                    'Belum ada data barang tersedia',
+                                    style: TextStyle(
+                                        color: Color(0xFFB1B5C0),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500),
+                                  )
+                                ],
+                              ));
+                        } else {
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              TabBar(
+                                isScrollable: false,
+                                controller: _tabController,
+                                dividerColor: const Color(0xFFEBEBED),
+                                dividerHeight: 1,
+                                labelColor: const Color(0xFF303030),
+                                unselectedLabelColor: const Color(0xFFB1B5C0),
+                                indicatorColor: const Color(0xFF303030),
+                                indicatorWeight: 1,
+                                indicatorSize: TabBarIndicatorSize.tab,
+                                labelStyle: const TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                ),
+                                tabs: const <Widget>[
+                                  Tab(text: 'Tunai'),
+                                  Tab(text: 'e-Wallet'),
+                                  Tab(text: 'Transfer'),
+                                ],
+                              ),
+                              const SizedBox(
+                                height: 16,
+                              ),
                               Container(
-                                width: 400,
-                                height: 336,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      width: double.infinity,
-                                      decoration: const BoxDecoration(
-                                          color: Color(0xFFFFF9E6),
-                                          borderRadius: BorderRadius.all(
-                                              Radius.circular(8))),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        mainAxisSize: MainAxisSize.max,
-                                        children: [
-                                          SvgPicture.asset(
-                                              'asset/image/info-circle.svg'),
-                                          const SizedBox(
-                                            width: 8,
-                                          ),
-                                          const Text(
-                                            'Bayar dengan uang pas',
-                                            style: TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                                fontSize: 12,
-                                                color: Color(0xFFE5851F)),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 16,
-                                    ),
-                                    RichText(
-                                      text: const TextSpan(
-                                        text: 'Uang yang diterima ',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w400,
-                                            color: Color(0xFF6C7278)),
-                                        children: [
-                                          TextSpan(
-                                            text: '*',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(
-                                      height: 6,
-                                    ),
-                                    Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 16, vertical: 0),
-                                        decoration: const BoxDecoration(
-                                            borderRadius: BorderRadius.all(
-                                                Radius.circular(8)),
-                                            color: Color(0XFFF6F6F6)),
-                                        child: Row(
+                                  height: _getContainerHeight(),
+                                  child: TabBarView(
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    controller: _tabController,
+                                    children: [
+                                      Container(
+                                        width: 400,
+                                        height: 336,
+                                        child: Column(
                                           mainAxisAlignment:
                                               MainAxisAlignment.start,
                                           crossAxisAlignment:
-                                              CrossAxisAlignment.center,
+                                              CrossAxisAlignment.start,
+                                          mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Text(
-                                              'Rp',
-                                              style: TextStyle(
-                                                  color: Color(0xFFA8A8A8),
-                                                  fontWeight: FontWeight.w500,
-                                                  fontSize: 14),
+                                            Container(
+                                              padding: const EdgeInsets.all(8),
+                                              width: double.infinity,
+                                              decoration: const BoxDecoration(
+                                                  color: Color(0xFFFFF9E6),
+                                                  borderRadius:
+                                                      BorderRadius.all(
+                                                          Radius.circular(8))),
+                                              child: Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                mainAxisSize: MainAxisSize.max,
+                                                children: [
+                                                  SvgPicture.asset(
+                                                      'asset/image/info-circle.svg'),
+                                                  const SizedBox(
+                                                    width: 8,
+                                                  ),
+                                                  const Text(
+                                                    'Bayar dengan uang pas',
+                                                    style: TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w500,
+                                                        fontSize: 12,
+                                                        color:
+                                                            Color(0xFFE5851F)),
+                                                  ),
+                                                ],
+                                              ),
                                             ),
                                             const SizedBox(
-                                              width: 8,
+                                              height: 16,
                                             ),
-                                            Flexible(
-                                              child: TextFormField(
-                                                keyboardType:
-                                                    TextInputType.number,
-                                                controller: kembalianControler,
-                                                focusNode: _focusNodekembalian,
-                                                maxLength: 10,
-                                                inputFormatters: [
-                                                  FilteringTextInputFormatter
-                                                      .digitsOnly
+                                            RichText(
+                                              text: const TextSpan(
+                                                text: 'Uang yang diterima ',
+                                                style: TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w400,
+                                                    color: Color(0xFF6C7278)),
+                                                children: [
+                                                  TextSpan(
+                                                    text: '*',
+                                                    style: TextStyle(
+                                                        color: Colors.red),
+                                                  ),
                                                 ],
-                                                // validator: (value) {
-                                                //   if (value == null ||
-                                                //       value.isEmpty) {
-                                                //     return 'Isi data lebih dahulu';
-                                                //   }
-                                                //   return null;
-                                                // },
-                                                style: const TextStyle(
-                                                    color: Color(0xFF101010),
-                                                    fontWeight: FontWeight.w500,
-                                                    fontSize: 14),
-                                                decoration:
-                                                    const InputDecoration(
-                                                        counterText: '',
-                                                        hintStyle:
-                                                            TextStyle(
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                              height: 6,
+                                            ),
+                                            Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 16,
+                                                        vertical: 0),
+                                                decoration: const BoxDecoration(
+                                                    borderRadius:
+                                                        BorderRadius.all(
+                                                            Radius.circular(8)),
+                                                    color: Color(0XFFF6F6F6)),
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.start,
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.center,
+                                                  children: [
+                                                    const Text(
+                                                      'Rp',
+                                                      style: TextStyle(
+                                                          color:
+                                                              Color(0xFFA8A8A8),
+                                                          fontWeight:
+                                                              FontWeight.w500,
+                                                          fontSize: 14),
+                                                    ),
+                                                    const SizedBox(
+                                                      width: 8,
+                                                    ),
+                                                    Flexible(
+                                                      child: TextFormField(
+                                                        keyboardType:
+                                                            TextInputType
+                                                                .number,
+                                                        controller:
+                                                            kembalianControler,
+                                                        focusNode:
+                                                            _focusNodekembalian,
+                                                        maxLength: 10,
+                                                        inputFormatters: [
+                                                          FilteringTextInputFormatter
+                                                              .digitsOnly
+                                                        ],
+                                                        // validator: (value) {
+                                                        //   if (value == null ||
+                                                        //       value.isEmpty) {
+                                                        //     return 'Isi data lebih dahulu';
+                                                        //   }
+                                                        //   return null;
+                                                        // },
+                                                        style: const TextStyle(
+                                                            color: Color(
+                                                                0xFF101010),
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            fontSize: 14),
+                                                        decoration: const InputDecoration(
+                                                            counterText: '',
+                                                            hintStyle: TextStyle(
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w500,
                                                                 fontSize: 12,
                                                                 color: Color(
                                                                     0xFFA8A8A8)),
-                                                        hintText:
-                                                            'Masukkan nominal',
-                                                        border:
-                                                            InputBorder.none),
-                                              ),
+                                                            hintText:
+                                                                'Masukkan nominal',
+                                                            border: InputBorder
+                                                                .none),
+                                                      ),
+                                                    )
+                                                  ],
+                                                )),
+                                            const SizedBox(
+                                              height: 16,
+                                            ),
+                                            GridView.builder(
+                                              physics:
+                                                  const NeverScrollableScrollPhysics(),
+                                              shrinkWrap: true,
+                                              gridDelegate:
+                                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                                      crossAxisCount: 2,
+                                                      mainAxisSpacing: 16,
+                                                      crossAxisSpacing: 16,
+                                                      childAspectRatio: 3.027),
+                                              itemCount: nominal.length,
+                                              itemBuilder: (context, index) {
+                                                return GestureDetector(
+                                                  onTap: () {
+                                                    setState(() {
+                                                      kembalianControler.text =
+                                                          nominal[index]
+                                                              .toString();
+                                                    });
+                                                  },
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            16),
+                                                    decoration: BoxDecoration(
+                                                        border: Border.all(
+                                                            color: const Color(
+                                                                0xFFEEEEEE),
+                                                            width: 1),
+                                                        borderRadius:
+                                                            const BorderRadius
+                                                                .all(
+                                                                Radius.circular(
+                                                                    10))),
+                                                    child: Row(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        const Text(
+                                                          'Rp',
+                                                          style: TextStyle(
+                                                              color: Color(
+                                                                  0xFF979899),
+                                                              fontSize: 12,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Text(
+                                                          nominalFormat.format(
+                                                              nominal[index]),
+                                                          style: const TextStyle(
+                                                              color: Color(
+                                                                  0xFF2E6CE9),
+                                                              fontSize: 16,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w600),
+                                                        )
+                                                      ],
+                                                    ),
+                                                  ),
+                                                );
+                                              },
                                             )
                                           ],
-                                        )),
-                                    const SizedBox(
-                                      height: 16,
-                                    ),
-                                    GridView.builder(
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      shrinkWrap: true,
-                                      gridDelegate:
-                                          const SliverGridDelegateWithFixedCrossAxisCount(
-                                              crossAxisCount: 2,
-                                              mainAxisSpacing: 16,
-                                              crossAxisSpacing: 16,
-                                              childAspectRatio: 3.027),
-                                      itemCount: nominal.length,
-                                      itemBuilder: (context, index) {
-                                        return GestureDetector(
-                                          onTap: () {
-                                            setState(() {
-                                              kembalianControler.text =
-                                                  nominal[index].toString();
-                                            });
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(16),
-                                            decoration: BoxDecoration(
-                                                border: Border.all(
-                                                    color:
-                                                        const Color(0xFFEEEEEE),
-                                                    width: 1),
-                                                borderRadius:
-                                                    const BorderRadius.all(
-                                                        Radius.circular(10))),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.center,
-                                              children: [
-                                                const Text(
-                                                  'Rp',
-                                                  style: TextStyle(
-                                                      color: Color(0xFF979899),
-                                                      fontSize: 12,
-                                                      fontWeight:
-                                                          FontWeight.w600),
-                                                ),
-                                                const SizedBox(
-                                                  width: 4,
-                                                ),
-                                                Text(
-                                                  nominalFormat
-                                                      .format(nominal[index]),
-                                                  style: const TextStyle(
-                                                      color: Color(0xFF2E6CE9),
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.w600),
-                                                )
-                                              ],
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                    )
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                  width: double.infinity,
-                                  height: 800,
-                                  child: SingleChildScrollView(
-                                    physics: const ScrollPhysics(),
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
+                                        ),
+                                      ),
+                                      Container(
                                           width: double.infinity,
-                                          decoration: const BoxDecoration(
-                                              color: Color(0xFFFFF9E6),
-                                              borderRadius: BorderRadius.all(
-                                                  Radius.circular(8))),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            mainAxisSize: MainAxisSize.max,
-                                            children: [
-                                              SvgPicture.asset(
-                                                  'asset/image/info-circle.svg'),
-                                              const SizedBox(
-                                                width: 8,
-                                              ),
-                                              const Text(
-                                                'Pastikan sudah terbayar',
-                                                style: TextStyle(
-                                                    fontWeight: FontWeight.w500,
-                                                    fontSize: 12,
-                                                    color: Color(0xFFE5851F)),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(
-                                          height: 16,
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 16, vertical: 8),
-                                          width: double.infinity,
-                                          height: 46,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF6F6F6),
-                                            border: Border.all(
-                                                color: Colors.transparent,
-                                                width: 1.0),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: DropdownButtonHideUnderline(
-                                            child: DropdownButton2<String>(
-                                              iconStyleData: IconStyleData(
-                                                  icon: SvgPicture.asset(
-                                                      'asset/image/arrow-down.svg')),
-                                              isExpanded: true,
-                                              isDense: false,
-                                              hint: const Text(
-                                                'Select Item',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: Color(0xFF576067)),
-                                              ),
-                                              selectedItemBuilder: (context) {
-                                                return jenisEWallet
-                                                    .map((String item) {
-                                                  return Container(
-                                                    alignment:
-                                                        Alignment.centerLeft,
-                                                    child: Text(
-                                                      item,
-                                                      style: const TextStyle(
-                                                          fontSize: 14,
-                                                          fontWeight:
-                                                              FontWeight.w400,
-                                                          color: Color(
-                                                              0xFF000000)),
-                                                    ),
-                                                  );
-                                                }).toList();
-                                              },
-                                              items: jenisEWallet
-                                                  .map((String item) =>
-                                                      DropdownMenuItem<String>(
-                                                          value: item,
-                                                          child: Container(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .only(
-                                                                    left: 12,
-                                                                    right: 12,
-                                                                    bottom: 4,
-                                                                    top: 0),
-                                                            width:
-                                                                double.infinity,
-                                                            decoration: const BoxDecoration(
-                                                                border: Border(
-                                                                    bottom: BorderSide(
-                                                                        width:
-                                                                            1,
-                                                                        color: Color(
-                                                                            0xFFE1E1E1)))),
-                                                            child: Text(
-                                                              item,
-                                                              style:
-                                                                  const TextStyle(
-                                                                fontSize: 12,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                color: Color(
-                                                                    0xFF717179),
-                                                              ),
-                                                            ),
-                                                          )))
-                                                  .toList(),
-                                              value: selectedValueEWallet,
-                                              onChanged: (String? value) {
-                                                setState(() {
-                                                  selectedValueEWallet = value;
-                                                });
-                                              },
-                                              buttonStyleData:
-                                                  const ButtonStyleData(
-                                                padding: EdgeInsets.symmetric(
-                                                    horizontal: 0),
-                                                height: 40,
-                                                width: 213,
-                                              ),
-                                              menuItemStyleData:
-                                                  const MenuItemStyleData(
-                                                padding: EdgeInsets.symmetric(
-                                                    horizontal: 0),
-                                                height: 30,
-                                              ),
-                                              dropdownStyleData:
-                                                  const DropdownStyleData(
-                                                      elevation: 4,
-                                                      maxHeight: 160,
-                                                      useSafeArea: true,
-                                                      padding: EdgeInsets.zero,
-                                                      decoration: BoxDecoration(
-                                                        borderRadius:
-                                                            BorderRadius.all(
-                                                                Radius.circular(
-                                                                    5)),
-                                                        color: Colors.white,
-                                                      )),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(
-                                          height: 16,
-                                        ),
-                                        Image.asset('asset/qris/qris.png'),
-                                        const SizedBox(
-                                          height: 32,
-                                        )
-                                      ],
-                                    ),
-                                  )),
-                              Container(
-                                  width: double.infinity,
-                                  height: 50,
-                                  child: SingleChildScrollView(
-                                    child: Column(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.start,
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.all(8),
-                                          width: double.infinity,
-                                          decoration: const BoxDecoration(
-                                              color: Color(0xFFFFF9E6),
-                                              borderRadius: BorderRadius.all(
-                                                  Radius.circular(8))),
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.center,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.center,
-                                            mainAxisSize: MainAxisSize.max,
-                                            children: [
-                                              SvgPicture.asset(
-                                                  'asset/image/info-circle.svg'),
-                                              const SizedBox(
-                                                width: 8,
-                                              ),
-                                              const Expanded(
-                                                child: Text(
-                                                  'Pastikan Bank Tujuan yang diinginkan memiliki data yang benar',
-                                                  style: TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w500,
-                                                      fontSize: 12,
-                                                      color: Color(0xFFE5851F)),
-                                                ),
-                                              )
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(
-                                          height: 16,
-                                        ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 16, vertical: 8),
-                                          width: double.infinity,
-                                          height: 46,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFF6F6F6),
-                                            border: Border.all(
-                                                color: Colors.transparent,
-                                                width: 1.0),
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                          child: DropdownButtonHideUnderline(
-                                            child: DropdownButton2<String>(
-                                              iconStyleData: IconStyleData(
-                                                  icon: SvgPicture.asset(
-                                                      'asset/image/arrow-down.svg')),
-                                              isExpanded: true,
-                                              isDense: false,
-                                              hint: const Text(
-                                                'Select Item',
-                                                style: TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: Color(0xFF576067)),
-                                              ),
-                                              selectedItemBuilder: (context) {
-                                                return jenisBank
-                                                    .map((String item) {
-                                                  return Container(
-                                                    alignment:
-                                                        Alignment.centerLeft,
-                                                    child: Text(
-                                                      item,
-                                                      style: const TextStyle(
-                                                          fontSize: 14,
-                                                          fontWeight:
-                                                              FontWeight.w400,
-                                                          color: Color(
-                                                              0xFF000000)),
-                                                    ),
-                                                  );
-                                                }).toList();
-                                              },
-                                              items: jenisBank
-                                                  .map((String item) =>
-                                                      DropdownMenuItem<String>(
-                                                          value: item,
-                                                          child: Container(
-                                                            padding:
-                                                                const EdgeInsets
-                                                                    .only(
-                                                                    left: 12,
-                                                                    right: 12,
-                                                                    bottom: 4,
-                                                                    top: 0),
-                                                            width:
-                                                                double.infinity,
-                                                            decoration: const BoxDecoration(
-                                                                border: Border(
-                                                                    bottom: BorderSide(
-                                                                        width:
-                                                                            1,
-                                                                        color: Color(
-                                                                            0xFFE1E1E1)))),
-                                                            child: Text(
-                                                              item,
-                                                              style:
-                                                                  const TextStyle(
-                                                                fontSize: 12,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                color: Color(
-                                                                    0xFF717179),
-                                                              ),
-                                                            ),
-                                                          )))
-                                                  .toList(),
-                                              value: selectedValueBank,
-                                              onChanged: (String? value) {
-                                                setState(() {
-                                                  selectedValueBank = value;
-                                                  bankIndex =
-                                                      jenisBank.indexOf(value!);
-                                                });
-                                              },
-                                              buttonStyleData:
-                                                  const ButtonStyleData(
-                                                padding: EdgeInsets.symmetric(
-                                                    horizontal: 0),
-                                                height: 40,
-                                                width: 213,
-                                              ),
-                                              menuItemStyleData:
-                                                  const MenuItemStyleData(
-                                                padding: EdgeInsets.symmetric(
-                                                    horizontal: 0),
-                                                height: 30,
-                                              ),
-                                              dropdownStyleData:
-                                                  const DropdownStyleData(
-                                                      elevation: 4,
-                                                      maxHeight: 160,
-                                                      useSafeArea: true,
-                                                      padding: EdgeInsets.zero,
-                                                      decoration: BoxDecoration(
-                                                        borderRadius:
-                                                            BorderRadius.all(
-                                                                Radius.circular(
-                                                                    5)),
-                                                        color: Colors.white,
-                                                      )),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(
-                                          height: 16,
-                                        ),
-                                        Container(
-                                            width: double.infinity,
-                                            height: 170,
-                                            padding: const EdgeInsets.all(16),
-                                            decoration: const BoxDecoration(
-                                              color: Color(0xFFE5F6FF),
-                                              borderRadius: BorderRadius.all(
-                                                  Radius.circular(8)),
-                                              border: GradientBoxBorder(
-                                                  gradient: LinearGradient(
-                                                      colors: [
-                                                    Color(0xFF2E6CE9),
-                                                    Color(0x008CBB4D)
-                                                  ],
-                                                      begin:
-                                                          Alignment.topCenter,
-                                                      end: Alignment
-                                                          .bottomCenter)),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Color(0x1A2E6CE9),
-                                                  offset: Offset(0, -10),
-                                                  blurRadius: 20,
-                                                  spreadRadius: 0,
-                                                ),
-                                              ],
-                                            ),
+                                          height: 800,
+                                          child: SingleChildScrollView(
+                                            physics: const ScrollPhysics(),
                                             child: Column(
                                               mainAxisAlignment:
-                                                  MainAxisAlignment.end,
+                                                  MainAxisAlignment.start,
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
-                                                Image.asset(
-                                                  logoBank[bankIndex],
-                                                  width: 40,
-                                                  height: 40,
-                                                ),
-                                                const SizedBox(
-                                                  height: 8,
-                                                ),
-                                                Text(
-                                                  Bank[bankIndex],
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.w400,
-                                                    color: Color(0xFF515151),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.all(8),
+                                                  width: double.infinity,
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                          color:
+                                                              Color(0xFFFFF9E6),
+                                                          borderRadius:
+                                                              BorderRadius.all(
+                                                                  Radius
+                                                                      .circular(
+                                                                          8))),
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .center,
+                                                    mainAxisSize:
+                                                        MainAxisSize.max,
+                                                    children: [
+                                                      SvgPicture.asset(
+                                                          'asset/image/info-circle.svg'),
+                                                      const SizedBox(
+                                                        width: 8,
+                                                      ),
+                                                      const Text(
+                                                        'Pastikan sudah terbayar',
+                                                        style: TextStyle(
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            fontSize: 12,
+                                                            color: Color(
+                                                                0xFFE5851F)),
+                                                      ),
+                                                    ],
                                                   ),
                                                 ),
-                                                Text(
-                                                  rekBank[bankIndex],
-                                                  style: const TextStyle(
-                                                    fontSize: 14,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: Color(0xFF303030),
+                                                const SizedBox(
+                                                  height: 16,
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 8),
+                                                  width: double.infinity,
+                                                  height: 46,
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFFF6F6F6),
+                                                    border: Border.all(
+                                                        color:
+                                                            Colors.transparent,
+                                                        width: 1.0),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                  child:
+                                                      DropdownButtonHideUnderline(
+                                                    child: DropdownButton2<
+                                                        Ewalletmodel>(
+                                                      iconStyleData: IconStyleData(
+                                                          icon: SvgPicture.asset(
+                                                              'asset/image/arrow-down.svg')),
+                                                      isExpanded: true,
+                                                      isDense: false,
+                                                      hint: const Text(
+                                                        'Data eWalet kosong',
+                                                        style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w400,
+                                                            color: Color(
+                                                                0xFF576067)),
+                                                      ),
+                                                      selectedItemBuilder:
+                                                          (context) {
+                                                        return eWalletlist.map(
+                                                            (Ewalletmodel
+                                                                item) {
+                                                          return Container(
+                                                            alignment: Alignment
+                                                                .centerLeft,
+                                                            child: Text(
+                                                              item.namaEwallet ??
+                                                                  '',
+                                                              style: const TextStyle(
+                                                                  fontSize: 14,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w400,
+                                                                  color: Color(
+                                                                      0xFF000000)),
+                                                            ),
+                                                          );
+                                                        }).toList();
+                                                      },
+                                                      items: eWalletlist
+                                                          .map((Ewalletmodel
+                                                                  item) =>
+                                                              DropdownMenuItem<
+                                                                      Ewalletmodel>(
+                                                                  value: item,
+                                                                  child:
+                                                                      Container(
+                                                                    padding: const EdgeInsets
+                                                                        .only(
+                                                                        left:
+                                                                            12,
+                                                                        right:
+                                                                            12,
+                                                                        bottom:
+                                                                            4,
+                                                                        top: 0),
+                                                                    width: double
+                                                                        .infinity,
+                                                                    decoration:
+                                                                        const BoxDecoration(
+                                                                            border:
+                                                                                Border(bottom: BorderSide(width: 1, color: Color(0xFFE1E1E1)))),
+                                                                    child: Text(
+                                                                      item.namaEwallet ??
+                                                                          '',
+                                                                      style:
+                                                                          const TextStyle(
+                                                                        fontSize:
+                                                                            12,
+                                                                        fontWeight:
+                                                                            FontWeight.w500,
+                                                                        color: Color(
+                                                                            0xFF717179),
+                                                                      ),
+                                                                    ),
+                                                                  )))
+                                                          .toList(),
+                                                      value:
+                                                          selectedValueEWallet,
+                                                      onChanged: (Ewalletmodel?
+                                                          value) {
+                                                        setState(() {
+                                                          selectedValueEWallet =
+                                                              value;
+                                                        });
+                                                      },
+                                                      buttonStyleData:
+                                                          const ButtonStyleData(
+                                                        padding: EdgeInsets
+                                                            .symmetric(
+                                                                horizontal: 0),
+                                                        height: 40,
+                                                        width: 213,
+                                                      ),
+                                                      menuItemStyleData:
+                                                          const MenuItemStyleData(
+                                                        padding: EdgeInsets
+                                                            .symmetric(
+                                                                horizontal: 0),
+                                                        height: 30,
+                                                      ),
+                                                      dropdownStyleData:
+                                                          const DropdownStyleData(
+                                                              elevation: 4,
+                                                              maxHeight: 160,
+                                                              useSafeArea: true,
+                                                              padding:
+                                                                  EdgeInsets
+                                                                      .zero,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                borderRadius: BorderRadius
+                                                                    .all(Radius
+                                                                        .circular(
+                                                                            5)),
+                                                                color: Colors
+                                                                    .white,
+                                                              )),
+                                                    ),
                                                   ),
                                                 ),
                                                 const SizedBox(
-                                                  height: 8,
+                                                  height: 16,
+                                                ),
+                                                CachedNetworkImage(
+                                                  fit: BoxFit.fitWidth,
+                                                  imageUrl:
+                                                      _apiewallet.getImage(
+                                                          selectedValueEWallet
+                                                                  ?.image ??
+                                                              ''),
+                                                  progressIndicatorBuilder:
+                                                      (context, url, progress) {
+                                                    return Center(
+                                                        child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment
+                                                              .center,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .center,
+                                                      children: [
+                                                        CircularProgressIndicator(
+                                                          value: progress
+                                                                      .totalSize !=
+                                                                  null
+                                                              ? progress
+                                                                      .downloaded /
+                                                                  (progress
+                                                                          .totalSize ??
+                                                                      1)
+                                                              : null,
+                                                        ),
+                                                        if (progress
+                                                                .totalSize !=
+                                                            null)
+                                                          Text(
+                                                            '${(progress.downloaded / 1000000).toStringAsFixed(2)} / ${(progress.totalSize! / 1000000).toStringAsFixed(2)} MB',
+                                                            style:
+                                                                const TextStyle(
+                                                              fontSize: 12,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w500,
+                                                              color:
+                                                                  Colors.black,
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    ));
+                                                  },
+                                                  errorWidget:
+                                                      (context, url, error) {
+                                                    return const SizedBox
+                                                        .shrink();
+                                                  },
+                                                ),
+                                                const SizedBox(
+                                                  height: 32,
+                                                )
+                                              ],
+                                            ),
+                                          )),
+                                      Container(
+                                          width: double.infinity,
+                                          height: 50,
+                                          child: SingleChildScrollView(
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets.all(8),
+                                                  width: double.infinity,
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                          color:
+                                                              Color(0xFFFFF9E6),
+                                                          borderRadius:
+                                                              BorderRadius.all(
+                                                                  Radius
+                                                                      .circular(
+                                                                          8))),
+                                                  child: Row(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .center,
+                                                    mainAxisSize:
+                                                        MainAxisSize.max,
+                                                    children: [
+                                                      SvgPicture.asset(
+                                                          'asset/image/info-circle.svg'),
+                                                      const SizedBox(
+                                                        width: 8,
+                                                      ),
+                                                      const Expanded(
+                                                        child: Text(
+                                                          'Pastikan Bank Tujuan yang diinginkan memiliki data yang benar',
+                                                          style: TextStyle(
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .w500,
+                                                              fontSize: 12,
+                                                              color: Color(
+                                                                  0xFFE5851F)),
+                                                        ),
+                                                      )
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(
+                                                  height: 16,
+                                                ),
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 16,
+                                                      vertical: 8),
+                                                  width: double.infinity,
+                                                  height: 46,
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFFF6F6F6),
+                                                    border: Border.all(
+                                                        color:
+                                                            Colors.transparent,
+                                                        width: 1.0),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                  child:
+                                                      DropdownButtonHideUnderline(
+                                                    child: DropdownButton2<
+                                                        Rekeningmodel>(
+                                                      iconStyleData: IconStyleData(
+                                                          icon: SvgPicture.asset(
+                                                              'asset/image/arrow-down.svg')),
+                                                      isExpanded: true,
+                                                      isDense: false,
+                                                      hint: const Text(
+                                                        'Tidak ada data rekening',
+                                                        style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w400,
+                                                            color: Color(
+                                                                0xFF576067)),
+                                                      ),
+                                                      selectedItemBuilder:
+                                                          (context) {
+                                                        return listRekening.map(
+                                                            (Rekeningmodel
+                                                                item) {
+                                                          return Container(
+                                                            alignment: Alignment
+                                                                .centerLeft,
+                                                            child: Text(
+                                                              item.namaBank ??
+                                                                  '',
+                                                              style: const TextStyle(
+                                                                  fontSize: 14,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w400,
+                                                                  color: Color(
+                                                                      0xFF000000)),
+                                                            ),
+                                                          );
+                                                        }).toList();
+                                                      },
+                                                      items: listRekening
+                                                          .map((Rekeningmodel
+                                                                  item) =>
+                                                              DropdownMenuItem<
+                                                                      Rekeningmodel>(
+                                                                  value: item,
+                                                                  child:
+                                                                      Container(
+                                                                    padding: const EdgeInsets
+                                                                        .only(
+                                                                        left:
+                                                                            12,
+                                                                        right:
+                                                                            12,
+                                                                        bottom:
+                                                                            4,
+                                                                        top: 0),
+                                                                    width: double
+                                                                        .infinity,
+                                                                    decoration:
+                                                                        const BoxDecoration(
+                                                                            border:
+                                                                                Border(bottom: BorderSide(width: 1, color: Color(0xFFE1E1E1)))),
+                                                                    child: Text(
+                                                                      item.namaBank ??
+                                                                          '',
+                                                                      style:
+                                                                          const TextStyle(
+                                                                        fontSize:
+                                                                            12,
+                                                                        fontWeight:
+                                                                            FontWeight.w500,
+                                                                        color: Color(
+                                                                            0xFF717179),
+                                                                      ),
+                                                                    ),
+                                                                  )))
+                                                          .toList(),
+                                                      value: selectedValueBank,
+                                                      onChanged: (Rekeningmodel?
+                                                          value) {
+                                                        setState(() {
+                                                          selectedValueBank =
+                                                              value;
+                                                        });
+                                                      },
+                                                      buttonStyleData:
+                                                          const ButtonStyleData(
+                                                        padding: EdgeInsets
+                                                            .symmetric(
+                                                                horizontal: 0),
+                                                        height: 40,
+                                                        width: 213,
+                                                      ),
+                                                      menuItemStyleData:
+                                                          const MenuItemStyleData(
+                                                        padding: EdgeInsets
+                                                            .symmetric(
+                                                                horizontal: 0),
+                                                        height: 30,
+                                                      ),
+                                                      dropdownStyleData:
+                                                          const DropdownStyleData(
+                                                              elevation: 4,
+                                                              maxHeight: 160,
+                                                              useSafeArea: true,
+                                                              padding:
+                                                                  EdgeInsets
+                                                                      .zero,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                borderRadius: BorderRadius
+                                                                    .all(Radius
+                                                                        .circular(
+                                                                            5)),
+                                                                color: Colors
+                                                                    .white,
+                                                              )),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(
+                                                  height: 16,
+                                                ),
+                                                Container(
+                                                    width: double.infinity,
+                                                    height: 170,
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                            16),
+                                                    decoration:
+                                                        const BoxDecoration(
+                                                      color: Color(0xFFE5F6FF),
+                                                      borderRadius:
+                                                          BorderRadius.all(
+                                                              Radius.circular(
+                                                                  8)),
+                                                      border: GradientBoxBorder(
+                                                          gradient: LinearGradient(
+                                                              colors: [
+                                                            Color(0xFF2E6CE9),
+                                                            Color(0x008CBB4D)
+                                                          ],
+                                                              begin: Alignment
+                                                                  .topCenter,
+                                                              end: Alignment
+                                                                  .bottomCenter)),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color:
+                                                              Color(0x1A2E6CE9),
+                                                          offset:
+                                                              Offset(0, -10),
+                                                          blurRadius: 20,
+                                                          spreadRadius: 0,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: Column(
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment.end,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        selectedValueBank !=
+                                                                null
+                                                            ? Image.asset(
+                                                                'asset/Rekening/${selectedValueBank!.namaBank}.png',
+                                                                width: 40,
+                                                                height: 40,
+                                                                errorBuilder:
+                                                                    (context,
+                                                                        error,
+                                                                        stackTrace) {
+                                                                  return Image.asset(
+                                                                      width: 63,
+                                                                      height:
+                                                                          42,
+                                                                      'asset/Rekening/Bank Lainnya.png');
+                                                                },
+                                                              )
+                                                            : const SizedBox
+                                                                .shrink(),
+                                                        const SizedBox(
+                                                          height: 8,
+                                                        ),
+                                                        Text(
+                                                          selectedValueBank
+                                                                  ?.namaBank ??
+                                                              '',
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w400,
+                                                            color: Color(
+                                                                0xFF515151),
+                                                          ),
+                                                        ),
+                                                        Text(
+                                                          selectedValueBank
+                                                                  ?.nomerRekening ??
+                                                              '',
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight.w700,
+                                                            color: Color(
+                                                                0xFF303030),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 8,
+                                                        ),
+                                                        Text(
+                                                          selectedValueBank
+                                                                  ?.namaPemilik ??
+                                                              '',
+                                                          style:
+                                                              const TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w400,
+                                                            color: Color(
+                                                                0xFF303030),
+                                                          ),
+                                                        )
+                                                      ],
+                                                    )),
+                                                const SizedBox(
+                                                  height: 16,
                                                 ),
                                                 const Text(
-                                                  'a.n Fajar Sapto Mukti Raharjo',
+                                                  '* Pastikan data bank yang diinput oleh admin sudah benar, kami tidak bertanggung jawab apabila ada salah data nominal dan data bank yang diinputkan salah ',
                                                   style: TextStyle(
                                                     fontSize: 12,
                                                     fontWeight: FontWeight.w400,
-                                                    color: Color(0xFF303030),
+                                                    color: Color(0xFF2C3E50),
                                                   ),
                                                 )
                                               ],
-                                            )),
-                                        const SizedBox(
-                                          height: 16,
-                                        ),
-                                        const Text(
-                                          '* Pastikan data bank yang diinput oleh admin sudah benar, kami tidak bertanggung jawab apabila ada salah data nominal dan data bank yang diinputkan salah ',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w400,
-                                            color: Color(0xFF2C3E50),
-                                          ),
-                                        )
-                                      ],
-                                    ),
-                                  )),
+                                            ),
+                                          )),
+                                    ],
+                                  ))
                             ],
-                          ))
-                    ],
-                  ),
-                )
+                          );
+                        }
+                      },
+                    ))
               ],
             ),
           )),
@@ -929,8 +1187,84 @@ class _PembayarantransaksiState extends State<Pembayarantransaksi>
               width: double.infinity,
               child: customButtonPrimary(
                 alignment: Alignment.center,
-                onPressed: () {
-                  pushHomepage();
+                onPressed: () async {
+                  String? bayar;
+                  String harganya =
+                      kembalianControler.text.replaceAll(RegExp(r'[^\d]'), '');
+
+                  double? kembalian;
+                  double uangDibayar = 0;
+
+                  // Menghitung kembalian berdasarkan tipe pembayaran
+                  switch (_tabController.index) {
+                    case 0: // Cash// Pastikan harganya valid sebelum di-convert
+                      if (harganya.isEmpty || harganya == '0') {
+                        Notiferror.showNotif(
+                            context: context,
+                            description: 'Masukan jumlah uang yang valid');
+                        return;
+                      }
+
+                      // Mengonversi harga menjadi double
+                      try {
+                        uangDibayar = double.parse(harganya);
+                      } catch (e) {
+                        Notiferror.showNotif(
+                            context: context,
+                            description:
+                                'Masukan jumlah uang dengan format yang benar');
+                        return;
+                      }
+                      if (uangDibayar < widget.finalAmount) {
+                        Notiferror.showNotif(
+                            context: context,
+                            description:
+                                'Uang bayar tidak cukup untuk transaksi ${harganya}');
+                        return;
+                      }
+                      bayar = 'Cash';
+                      kembalian = uangDibayar - widget.finalAmount;
+                      break;
+                    case 1: // e-Wallet
+                      bayar = 'e-Wallet';
+                      uangDibayar = widget
+                          .finalAmount; // Mengasumsikan uang yang dibayar sama dengan total
+                      kembalian = 0;
+                      break;
+                    case 2: // Transfer
+                      bayar = 'Transfer';
+                      uangDibayar = widget
+                          .finalAmount; // Mengasumsikan uang yang dibayar sama dengan total
+                      kembalian = 0;
+                      break;
+                  }
+
+                  // Kirim data transaksi
+                  await _apitransaksi.addTransaksi(
+                    widget.idOutlet,
+                    widget.name,
+                    bayar!,
+                    widget.totalAmount,
+                    widget.finalAmount,
+                    uangDibayar,
+                    kembalian!,
+                    widget.totalPajak,
+                    widget.totalOperasional,
+                    widget.selectedProducts,
+                    widget.listpromosiselected,
+                    widget.biaya,
+                  );
+
+                  if (_apitransaksi.statusCode == 200 ||
+                      _apitransaksi.statusCode == 201) {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setInt('id_outlet', widget.idOutlet);
+                    pushHomepage(_apitransaksi.idTransaksi ?? 0,
+                        widget.idOutlet, bayar, kembalian.toInt());
+                  } else {
+                    Notiferror.showNotif(
+                        context: context, description: _apitransaksi.message);
+                  }
                 },
                 child: const Text(
                   'Bayar',
@@ -941,115 +1275,6 @@ class _PembayarantransaksiState extends State<Pembayarantransaksi>
                   ),
                 ),
               )),
-          // SizedBox(
-          //     height: 86,
-          //     child: TabBarView(
-          //       controller: _tabController,
-          //       children: [
-          //         SingleChildScrollView(
-          //           child: Container(
-          //               height: 86,
-          //               decoration: BoxDecoration(
-          //                 color: const Color(0xFFFDFEFE),
-          //                 boxShadow: [
-          //                   BoxShadow(
-          //                     color: const Color(0xFF888888).withOpacity(0.08),
-          //                     offset: const Offset(0, -4),
-          //                     blurRadius: 6,
-          //                     spreadRadius: 0,
-          //                   ),
-          //                 ],
-          //                 borderRadius: BorderRadius.circular(
-          //                     12), // Sesuai dengan button radius
-          //               ),
-          //               padding: const EdgeInsets.symmetric(
-          //                   horizontal: 24, vertical: 16),
-          //               width: double.infinity,
-          //               child: CustomButton(
-          //                 alignment: Alignment.center,
-          //                 onPressed: () {
-          //                   pushHomepage();
-          //                 },
-          //                 child: const Text(
-          //                   'Bayar',
-          //                   style: TextStyle(
-          //                     fontSize: 16,
-          //                     fontWeight: FontWeight.w600,
-          //                     color: Color(0xFFFFFFFF),
-          //                   ),
-          //                 ),
-          //               )),
-          //         ),
-          //         SingleChildScrollView(
-          //           child: Container(
-          //               height: 86,
-          //               decoration: BoxDecoration(
-          //                 color: const Color(0xFFFDFEFE),
-          //                 boxShadow: [
-          //                   BoxShadow(
-          //                     color: const Color(0xFF888888).withOpacity(0.08),
-          //                     offset: const Offset(0, -4),
-          //                     blurRadius: 6,
-          //                     spreadRadius: 0,
-          //                   ),
-          //                 ],
-          //                 borderRadius: BorderRadius.circular(
-          //                     12), // Sesuai dengan button radius
-          //               ),
-          //               padding: const EdgeInsets.symmetric(
-          //                   horizontal: 24, vertical: 16),
-          //               width: double.infinity,
-          //               child: CustomButton(
-          //                 alignment: Alignment.center,
-          //                 onPressed: () {
-          //                   pushHomepage();
-          //                 },
-          //                 child: const Text(
-          //                   'Bayar',
-          //                   style: TextStyle(
-          //                     fontSize: 16,
-          //                     fontWeight: FontWeight.w600,
-          //                     color: Color(0xFFFFFFFF),
-          //                   ),
-          //                 ),
-          //               )),
-          //         ),
-          //         SingleChildScrollView(
-          //           child: Container(
-          //               height: 86,
-          //               decoration: BoxDecoration(
-          //                 color: const Color(0xFFFDFEFE),
-          //                 boxShadow: [
-          //                   BoxShadow(
-          //                     color: const Color(0xFF888888).withOpacity(0.08),
-          //                     offset: const Offset(0, -4),
-          //                     blurRadius: 6,
-          //                     spreadRadius: 0,
-          //                   ),
-          //                 ],
-          //                 borderRadius: BorderRadius.circular(
-          //                     12), // Sesuai dengan button radius
-          //               ),
-          //               padding: const EdgeInsets.symmetric(
-          //                   horizontal: 24, vertical: 16),
-          //               width: double.infinity,
-          //               child: CustomButton(
-          //                 alignment: Alignment.center,
-          //                 onPressed: () {
-          //                   pushHomepage();
-          //                 },
-          //                 child: const Text(
-          //                   'Bayar',
-          //                   style: TextStyle(
-          //                     fontSize: 16,
-          //                     fontWeight: FontWeight.w600,
-          //                     color: Color(0xFFFFFFFF),
-          //                   ),
-          //                 ),
-          //               )),
-          //         ),
-          //       ],
-          //     ))
         ],
       )),
     );

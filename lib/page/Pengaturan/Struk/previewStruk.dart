@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dotted_line/dotted_line.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
@@ -14,6 +15,7 @@ class Previewstruk extends StatefulWidget {
   final bool kontak;
   final bool socialMedia;
   final bool catatan;
+  final String imageUrl;
   final String name;
   final String alamattext;
   final String kontaktext;
@@ -34,7 +36,8 @@ class Previewstruk extends StatefulWidget {
       required this.kontaktext,
       required this.socialMedia1text,
       required this.socialMedia2text,
-      required this.catatantext});
+      required this.catatantext,
+      required this.imageUrl});
 
   @override
   State<Previewstruk> createState() => _PreviewstrukState();
@@ -113,7 +116,83 @@ class _PreviewstrukState extends State<Previewstruk> {
                                 !widget.logo
                                     ? const SizedBox.shrink()
                                     : widget.image == null
-                                        ? const SizedBox.shrink()
+                                        ? Container(
+                                            margin: EdgeInsets.only(bottom: 8),
+                                            child: ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                              child: CachedNetworkImage(
+                                                fit: BoxFit.cover,
+                                                width: 84,
+                                                height: 84,
+                                                imageUrl: widget.imageUrl,
+                                                progressIndicatorBuilder:
+                                                    (context, url, progress) {
+                                                  return Center(
+                                                      child: Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      CircularProgressIndicator(
+                                                        value: progress
+                                                                    .totalSize !=
+                                                                null
+                                                            ? progress
+                                                                    .downloaded /
+                                                                (progress
+                                                                        .totalSize ??
+                                                                    1)
+                                                            : null,
+                                                      ),
+                                                      Text(
+                                                        '${(progress.downloaded / 1000000).toStringAsFixed(2)} / ${(progress.totalSize! / 1000000).toStringAsFixed(2)} MB',
+                                                        style: const TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            color:
+                                                                Colors.black),
+                                                      ),
+                                                    ],
+                                                  ));
+                                                },
+                                                errorWidget:
+                                                    (context, url, error) {
+                                                  return Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      SvgPicture.asset(
+                                                        'asset/image/gallery-add.svg',
+                                                        width: 24,
+                                                        height: 24,
+                                                      ),
+                                                      const SizedBox(
+                                                        height: 6,
+                                                      ),
+                                                      const Text(
+                                                        'Tambah Foto',
+                                                        style: TextStyle(
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                            color: const Color(
+                                                                0xFFA8A8A8)),
+                                                      )
+                                                    ],
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                          )
                                         : Container(
                                             margin: const EdgeInsets.only(
                                                 bottom: 8),

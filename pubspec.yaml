@@ -10,6 +10,7 @@ dependencies:
   animated_snack_bar: ^0.4.0
   avatar_plus: ^0.0.5
   bottom_sheet: ^4.0.4
+  cached_network_image: ^3.4.1
   country_code_picker: ^3.0.0
   d_chart: ^2.6.9
   datepicker_dropdown: ^0.1.5
@@ -18,25 +19,39 @@ dependencies:
   drop_shadow: ^0.1.0
   dropdown_button2: ^2.3.9
   dynamic_height_grid_view: ^0.0.4
+  easy_web_view: ^2.0.2
   fancy_password_field: ^2.0.7
   fl_chart: ^0.69.0
   flutter:
     sdk: flutter
+  flutter_dotenv: ^5.2.1
+  flutter_file_downloader: ^2.0.0
   flutter_form_builder: ^9.3.0
+
   flutter_screenutil: ^5.9.3
   flutter_staggered_grid_view: ^0.7.0
   flutter_svg: ^2.0.10+1
   flutter_svg_provider: ^1.0.7
+  flutter_widget_from_html: ^0.15.3
   google_fonts: ^6.2.1
   gradient_borders: ^1.0.1
   graphic: ^2.5.0
+  htmltopdfwidgets: ^1.0.5
+  http: ^1.2.2
   image_cropper: ^8.0.2
   image_picker: ^1.1.2
   intl: ^0.19.0
   intl_phone_number_input: ^0.7.4
   path_provider: ^2.1.5
+  pdf: ^3.11.1
   permission_handler: ^11.3.1
+  share_plus: ^10.1.2
+  shared_preferences: ^2.3.3
+  skeletonizer: ^1.4.2
+  syncfusion_flutter_pdfviewer: ^27.2.5
   toastification: ^2.3.0
+  webcontent_converter: ^0.0.9+2
+  webview_flutter: ^4.8.0
 
 dev_dependencies:
   flutter_test:
@@ -66,68 +81,21 @@ flutter:
           - asset: asset/fonts/geist/Geist-ExtraLight.ttf
             weight: 200
   assets:
-  - asset/background/Bgsplash.svg
-  - asset/background/Bgform.svg
-  - asset/background/Bgform.png
-  - asset/image/arrow-down.svg
-  - asset/image/Layer 2.svg
-  - asset/image/tabler-icon-cash-banknote.svg
-  - asset/image/tabler-icon-clipboard-text.svg
-  - asset/image/tabler-icon-list-check.svg
-  - asset/image/tabler-icon-square-rounded-plus-filled.svg
-  - asset/image/tabler-icon-transition-bottom.svg
-  - asset/image/tabler-icon-building-warehouse.svg
-  - asset/image/galeryView.svg
-  - asset/image/profile.svg
-  - asset/image/edit-2.svg
-  - asset/image/trash.svg
-  - asset/image/apple.svg
-  - asset/qris/qris.png
-  - asset/banklogo/bca.png
-  - asset/banklogo/bri.png
-  - asset/banklogo/mandiri.png
-  - asset/barang/Rectangle 894.png
-  - asset/image/celocelo.svg
-  - asset/background/Splashscreen.svg
-  - asset/background/BgBoarding.png
-  - asset/background/BgformNew.svg
-  - asset/image/beranda.svg
-  - asset/image/pengaturan.svg
-  - asset/image/transaksi.svg
-  - asset/image/box.svg
-  - asset/image/arrow-down-decrease.svg
-  - asset/image/arrow-down-increase.svg
-  - asset/image/arrow-right.svg
-  - asset/image/notification.svg
-  - asset/image/pembayaranEwallet.svg
-  - asset/image/pembayaranTransfer.svg
-  - asset/image/pembayaranTunai.svg
-  - asset/image/gallery-add.svg
-  - asset/image/edit.svg
-  - asset/image/info-circle.svg
-  - asset/background/Wallet.svg
-  - asset/setting/profile-2user.svg
-  - asset/setting/percentage-circle.svg
-  - asset/setting/message-question.svg
-  - asset/setting/ticket-discount.svg
-  - asset/setting/task-square.svg
-  - asset/setting/shop.svg
-  - asset/setting/security-safe.svg
-  - asset/image/shopping-bag.svg
-  - asset/kelolaOutlet/clarity_store-solid.svg
-  - asset/kelolaOutlet/Frame.png
-  - asset/kelolaOutlet/shop.svg
-  - asset/kelolaOutlet/login.svg
-  - asset/pegawai/Group 33979.svg
-  - asset/promosi/shop.svg
-  - asset/promosi/receipt-disscount.svg
-  - asset/promosi/vuesaxoutlinecalendar.svg
-  - asset/promosi/clock.svg
-  - asset/setting/receipt-text.svg
-  - asset/struk/play.svg
-  - asset/settingAccount/logout.svg
-  - asset/settingAccount/user-minus.svg
-  - asset/settingAccount/user-remove.svg
-  - asset/struk/printer.svg
-  - asset/detailorder/bag-tick-2.svg
-  - asset/detailorder/shop.svg
+  - .env
+  - asset/background/
+  - asset/banklogo/
+  - asset/barang/
+  - asset/detailorder/
+  - asset/image/
+  - asset/kelolaOutlet/
+  - asset/pegawai/
+  - asset/Pengaturan Pembayaran/
+  - asset/promosi/
+  - asset/qris/
+  - asset/setting/
+  - asset/settingAccount/
+  - asset/struk/
+  - asset/viewStruck/
+  - asset/Rekening/
+  - asset/buktipembayaran/
+

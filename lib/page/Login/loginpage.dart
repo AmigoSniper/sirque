@@ -138,7 +138,6 @@ class _LoginpageState extends State<Loginpage> {
                                   decoration: TextDecoration.underline),
                               recognizer: TapGestureRecognizer()
                                 ..onTap = () {
-                                  print("Teken");
                                   // Navigator.push(
                                   //     context,
                                   //     MaterialPageRoute(

@@ -1,4 +1,5 @@
 import 'package:avatar_plus/avatar_plus.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
 
 import 'package:flutter/material.dart';
@@ -6,25 +7,39 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:dotted_line/dotted_line.dart';
+import 'package:salescheck/Model/biayaTambahanModel.dart';
+import 'package:salescheck/Model/promosi.dart';
+import 'package:salescheck/Service/ApiBiayaTambahan.dart';
+import 'package:salescheck/Service/ApiPromosi.dart';
+import 'package:salescheck/Service/ApiTransaksi.dart';
 import 'package:salescheck/component/customButtonPrimary.dart';
 import 'package:salescheck/page/Transaksi/pembayaranTransaksi.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../Model/selectedProduct.dart';
 import 'package:bottom_sheet/bottom_sheet.dart';
 
+import '../../Service/ApiProduct.dart';
+import '../../component/customButtonColor.dart';
+
 class Detailtransaksi extends StatefulWidget {
+  final int idOutlet;
   final List<SelectedProduct> selectedProducts;
-  const Detailtransaksi({super.key, required this.selectedProducts});
+  const Detailtransaksi(
+      {super.key, required this.selectedProducts, required this.idOutlet});
 
   @override
   State<Detailtransaksi> createState() => _DetailtransaksiState();
 }
 
 class _DetailtransaksiState extends State<Detailtransaksi> {
-  final ScrollController _scrollController = new ScrollController();
+  final Apiproduct _apiProduct = Apiproduct();
+  final Apitransaksi _apiTransaksi = Apitransaksi();
+  final Apipromosi _apipromosi = Apipromosi();
+  final Apibiayatambahan _apibiayatambahan = Apibiayatambahan();
+  final ScrollController _scrollController = ScrollController();
   final numberFormat =
       NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
-  final TextEditingController customerNameControler =
-      new TextEditingController();
+  final TextEditingController customerNameControler = TextEditingController();
   String? customerName;
   bool tambahkanEnabel = false;
   List<Diskon> diskon = [
@@ -32,19 +47,25 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
     Diskon(id: 2, name: 'Diskon Kemerdekaan', percentage: 17.45),
     Diskon(id: 3, name: 'Diskon Rakyat Jelata', percentage: 5.0),
   ];
-
+  List<biayaTambahanModel> biaya = [];
+  List<Promosi> promosi = [];
+  List<Promosi> listpromosiselected = [];
   List<Diskon> listDiskonselected = [];
   Diskon? diskonSelected;
+  Promosi? promosiSelected;
   double totalAmount = 0;
-  int pajak = 11;
+  int pajak = 0;
+  int operasional = 0;
   double totalPajak = 0;
+  double totalOperasional = 0;
   double finalAmount = 0;
   double diskonAmount = 0;
   FocusNode _focusNodeNama = FocusNode();
   bool focusNama = false;
   void increaseStock(int index) {
     if (widget.selectedProducts[index].quantity <
-        widget.selectedProducts[index].stock) {
+            (widget.selectedProducts[index].stock ?? 100) ||
+        widget.selectedProducts[index].unlimitedStock == 1) {
       setState(() {
         widget.selectedProducts[index].quantity += 1;
         calculateTotalAmount();
@@ -90,41 +111,92 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
       totalAmount += product.price * product.quantity;
     }
     calculateTotalPajak();
+    calculateTotalOperasional();
+    if (biaya.isNotEmpty) {
+      if (biaya.first.status ?? false) {
+        calculateTotalPajak();
+      }
+      if (biaya.last.status ?? false) {
+        calculateTotalOperasional();
+      }
+    }
     disconCalculate();
     TotalfinalAmount();
   }
 
   void calculateTotalPajak() {
-    double pajakPercentage = pajak / 100;
-    double pajakAmount = totalAmount * pajakPercentage;
-    setState(() {
-      totalPajak = pajakAmount;
-    });
+    if (biaya.isNotEmpty && biaya.first.nilaiPajak != null) {
+      String nilai = biaya.first.nilaiPajak!.replaceAll('%', '');
+
+      double pajakPercentage = int.parse(nilai) / 100;
+      double pajakAmount = totalAmount * pajakPercentage;
+      setState(() {
+        totalPajak = pajakAmount;
+      });
+    }
+  }
+
+  void calculateTotalOperasional() {
+    if (biaya.isNotEmpty && biaya.last.nilaiPajak != null) {
+      String nilai = biaya.last.nilaiPajak!.replaceAll('%', '');
+
+      double operationalPercentage = int.parse(nilai) / 100;
+      double operasionalAmount = totalAmount * operationalPercentage;
+      setState(() {
+        totalOperasional = operasionalAmount;
+      });
+    }
   }
 
   void TotalfinalAmount() {
     print(
         'total harga = $finalAmount = $totalAmount + $totalPajak - ${disconCalculate()}');
     setState(() {
-      finalAmount = totalAmount + totalPajak - disconCalculate();
+      finalAmount =
+          totalAmount + totalPajak + totalOperasional - disconCalculate();
     });
-    print(finalAmount);
   }
 
   double disconCalculate() {
     double disconAmountCalculate = 0;
-    for (var listDiskonselectedloop in listDiskonselected) {
+    for (var listDiskonselectedloop in listpromosiselected) {
       disconAmountCalculate += listDiskonselectedloop.hitungDiskon(totalAmount);
-      print('diskon di dapat $diskonAmount');
     }
     return disconAmountCalculate;
+  }
+
+  Future<void> _readAndPrintPromosiData() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final int idOutlet = prefs.getInt('id_outlet') ?? 0;
+
+    promosi = await _apipromosi.getPromosiAktif(idOutlet);
+    if (_apipromosi.statusCode == 200) {
+      setState(() {
+        promosi;
+      });
+    } else {}
+  }
+
+  Future<void> _readAndPrintBiayaTambahanData() async {
+    biaya = await _apibiayatambahan.getBiayaTambahan();
+    if (_apibiayatambahan.statusCode == 200) {
+      String nilaiOperasional = biaya.last.nilaiPajak!.replaceAll('%', '');
+      String nilaiPajak = biaya.first.nilaiPajak!.replaceAll('%', '');
+      setState(() {
+        biaya;
+        operasional = int.parse(nilaiOperasional);
+        pajak = int.parse(nilaiPajak);
+      });
+      calculateTotalAmount();
+    } else {}
   }
 
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-    calculateTotalAmount();
+    _readAndPrintPromosiData();
+    _readAndPrintBiayaTambahanData();
     customerNameControler.addListener(() {
       setState(() {
         tambahkanEnabel = customerNameControler.text.isNotEmpty;
@@ -269,6 +341,7 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: const Color(0xFFFFFFFF),
       builder: (BuildContext context) {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 25),
@@ -276,6 +349,12 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                width: 50,
+                height: 4,
+                color: const Color(0xFFE9E9E9),
+                margin: const EdgeInsets.only(bottom: 16),
+              ),
               Text(
                 'Apakah anda yakin ingin menghapus $namaBarang dari keranjang?',
                 textAlign: TextAlign.center,
@@ -290,47 +369,48 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.max,
                 children: [
-                  ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                          shape: const RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(48))),
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          minimumSize: const Size(167.5, 50)),
-                      child: const Text(
-                        'Tidak, batal',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF09090B)),
-                      )),
-                  const SizedBox(
-                    height: 15,
+                  Flexible(
+                    child: CustombuttonColor(
+                        margin: const EdgeInsets.only(top: 10),
+                        height: 48,
+                        alignment: Alignment.center,
+                        color: const Color(0xFFFFFFFF),
+                        onPressed: () {
+                          Navigator.pop(
+                            context,
+                          );
+                        },
+                        child: const Text(
+                          'Tidak, Batal',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF09090B)),
+                        )),
                   ),
-                  ElevatedButton(
-                      onPressed: () {
-                        deleteProduct(index);
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                          shape: const RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(12))),
-                          backgroundColor: const Color(0xFFFF3E1D),
-                          minimumSize: const Size(167.5, 50)),
-                      child: const Text(
-                        'Ya, hapus',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFFFFFF)),
-                      )),
+                  const SizedBox(
+                    width: 8,
+                  ),
+                  Flexible(
+                    child: CustombuttonColor(
+                        margin: const EdgeInsets.only(top: 10),
+                        height: 48,
+                        alignment: Alignment.center,
+                        color: const Color(0xFFFF3E1D),
+                        onPressed: () {
+                          deleteProduct(index);
+                          Navigator.pop(context);
+                        },
+                        child: const Text(
+                          'Ya, Hapus',
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFFFFFFF)),
+                        )),
+                  )
                 ],
               )
             ],
@@ -522,15 +602,60 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                 borderRadius:
                                                     BorderRadius.circular(10)),
                                             child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              child: Image.asset(
-                                                'asset/barang/Rectangle 894.png',
-                                                fit: BoxFit.cover,
-                                                width: 56,
-                                                height: 56,
-                                              ),
-                                            )),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                                child: CachedNetworkImage(
+                                                  fit: BoxFit.cover,
+                                                  width: 56,
+                                                  height: 56,
+                                                  imageUrl:
+                                                      _apiProduct.getImage(
+                                                          product.imageUrl),
+                                                  progressIndicatorBuilder:
+                                                      (context, url, progress) {
+                                                    if (progress == null ||
+                                                        progress.totalSize ==
+                                                            null ||
+                                                        progress.totalSize ==
+                                                            0) {
+                                                      return const Center(
+                                                          child:
+                                                              CircularProgressIndicator()); // Jika tidak ada totalSize
+                                                    }
+                                                    return Center(
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        crossAxisAlignment:
+                                                            CrossAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          CircularProgressIndicator(
+                                                            value: progress
+                                                                    .downloaded /
+                                                                (progress
+                                                                        .totalSize ??
+                                                                    1),
+                                                          ),
+                                                          Text(
+                                                            '${(progress.downloaded / 1000000).toStringAsFixed(2)} / ${(progress.totalSize! / 1000000).toStringAsFixed(2)} MB',
+                                                            style: const TextStyle(
+                                                                fontSize: 12,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w500,
+                                                                color: Colors
+                                                                    .black),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    );
+                                                  },
+                                                  errorWidget: (context, url,
+                                                          error) =>
+                                                      const Icon(Icons.error),
+                                                ))),
                                         const SizedBox(
                                           width: 16,
                                         ),
@@ -549,6 +674,7 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                         .spaceBetween,
                                                 children: [
                                                   Container(
+                                                    width: 125,
                                                     child: Column(
                                                       mainAxisAlignment:
                                                           MainAxisAlignment
@@ -559,6 +685,8 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                       children: [
                                                         Text(
                                                           product.name,
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
                                                           style: const TextStyle(
                                                               fontSize: 14,
                                                               fontWeight:
@@ -731,7 +859,7 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                     fontWeight: FontWeight.w500,
                                     color: Color(0xFF303030)),
                               ),
-                              listDiskonselected.isEmpty
+                              listpromosiselected.isEmpty
                                   ? const SizedBox.shrink()
                                   : SizedBox(
                                       height: 56,
@@ -753,7 +881,7 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                               shrinkWrap: true,
                                               scrollDirection: Axis.horizontal,
                                               itemCount:
-                                                  listDiskonselected.length,
+                                                  listpromosiselected.length,
                                               itemBuilder: (context, index) {
                                                 return Container(
                                                     alignment: Alignment.center,
@@ -782,9 +910,10 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                           MainAxisSize.min,
                                                       children: [
                                                         Text(
-                                                          listDiskonselected[
-                                                                  index]
-                                                              .name,
+                                                          listpromosiselected[
+                                                                      index]
+                                                                  .namaPromosi ??
+                                                              '',
                                                           style: const TextStyle(
                                                               fontSize: 14,
                                                               fontWeight:
@@ -814,12 +943,14 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                                 EdgeInsets.zero,
                                                             onPressed: () {
                                                               setState(() {
-                                                                diskon.add(
-                                                                    listDiskonselected[
+                                                                promosi.add(
+                                                                    listpromosiselected[
                                                                         index]);
-                                                                listDiskonselected
-                                                                    .removeAt(
-                                                                        index);
+                                                                print(promosi
+                                                                    .length);
+                                                                listpromosiselected.remove(
+                                                                    listpromosiselected[
+                                                                        index]);
                                                                 calculateTotalAmount();
                                                               });
                                                             },
@@ -855,7 +986,7 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                     borderRadius: const BorderRadius.all(
                                         Radius.circular(8))),
                                 child: DropdownButtonHideUnderline(
-                                  child: DropdownButton2<Diskon>(
+                                  child: DropdownButton2<Promosi>(
                                     iconStyleData: IconStyleData(
                                         icon: SvgPicture.asset(
                                             'asset/image/arrow-down.svg')),
@@ -868,9 +999,9 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                           fontWeight: FontWeight.w500,
                                           color: Color(0xFFA8A8A8)),
                                     ),
-                                    items: diskon
-                                        .map((Diskon item) =>
-                                            DropdownMenuItem<Diskon>(
+                                    items: promosi
+                                        .map((Promosi item) =>
+                                            DropdownMenuItem<Promosi>(
                                               value: item,
                                               child: Container(
                                                 padding: const EdgeInsets.only(
@@ -886,7 +1017,7 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                             color: Color(
                                                                 0xFFE1E1E1)))),
                                                 child: Text(
-                                                  item.name,
+                                                  item.namaPromosi ?? '',
                                                   style: const TextStyle(
                                                     fontSize: 14,
                                                     fontWeight: FontWeight.w500,
@@ -896,17 +1027,13 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                               ),
                                             ))
                                         .toList(),
-                                    value: diskonSelected,
-                                    onChanged: (Diskon? newvalue) {
-                                      print(newvalue?.name);
-
+                                    value: promosiSelected,
+                                    onChanged: (Promosi? newvalue) {
                                       setState(() {
-                                        listDiskonselected.add(newvalue!);
-                                        diskon.remove(newvalue);
+                                        listpromosiselected.add(newvalue!);
+                                        promosi.remove(newvalue);
                                         calculateTotalAmount();
                                       });
-                                      print(listDiskonselected.length);
-                                      print(diskon.length);
                                     },
                                     buttonStyleData: const ButtonStyleData(
                                       padding:
@@ -1008,18 +1135,6 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                     fontWeight: FontWeight.w500,
                                                     color: Color(0xFF2C3E50)),
                                               ),
-                                              // SizedBox(
-                                              //   height: 22,
-                                              //   child: IconButton(
-                                              //       visualDensity:
-                                              //           VisualDensity.compact,
-                                              //       padding: EdgeInsets.zero,
-                                              //       constraints:
-                                              //           const BoxConstraints(),
-                                              //       onPressed: () {},
-                                              //       icon: SvgPicture.asset(
-                                              //           'asset/image/edit-2.svg')),
-                                              // )
                                             ],
                                           ),
                                         ),
@@ -1032,7 +1147,40 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                         )
                                       ],
                                     ),
-                                    listDiskonselected.isEmpty
+                                    const SizedBox(
+                                      height: 8,
+                                    ),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        SizedBox(
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Operasional $operasional%',
+                                                style: const TextStyle(
+                                                    fontSize: 14,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: Color(0xFF2C3E50)),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          numberFormat.format(totalOperasional),
+                                          style: const TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFF000000)),
+                                        )
+                                      ],
+                                    ),
+                                    listpromosiselected.isEmpty
                                         ? const SizedBox.shrink()
                                         : ListView.builder(
                                             padding:
@@ -1040,7 +1188,7 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                             shrinkWrap: true,
                                             scrollDirection: Axis.vertical,
                                             itemCount:
-                                                listDiskonselected.length,
+                                                listpromosiselected.length,
                                             itemBuilder: (context, index) {
                                               return Container(
                                                 margin:
@@ -1055,8 +1203,9 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                       MainAxisSize.max,
                                                   children: [
                                                     Text(
-                                                      listDiskonselected[index]
-                                                          .name,
+                                                      listpromosiselected[index]
+                                                              .namaPromosi ??
+                                                          '',
                                                       style: const TextStyle(
                                                           fontSize: 14,
                                                           fontWeight:
@@ -1065,7 +1214,7 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                                                               0xFF10B981)),
                                                     ),
                                                     Text(
-                                                      '- ${numberFormat.format(listDiskonselected[index].hitungDiskon(totalAmount))}',
+                                                      '- ${numberFormat.format(listpromosiselected[index].hitungDiskon(totalAmount))}',
                                                       style: const TextStyle(
                                                           fontSize: 14,
                                                           fontWeight:
@@ -1178,14 +1327,23 @@ class _DetailtransaksiState extends State<Detailtransaksi> {
                       height: 56,
                       width: double.infinity,
                       alignment: Alignment.center,
-                      onPressed: () {
+                      onPressed: () async {
                         if (customerName!.isNotEmpty) {
                           Navigator.push(
                               context,
                               MaterialPageRoute(
                                   builder: (context) => Pembayarantransaksi(
-                                        PriceTotal: finalAmount,
-                                        name: customerName,
+                                        finalAmount: finalAmount,
+                                        name: customerName ?? '',
+                                        idOutlet: widget.idOutlet,
+                                        totalAmount: totalAmount,
+                                        listpromosiselected:
+                                            listpromosiselected,
+                                        totalPajak: totalPajak,
+                                        totalOperasional: totalOperasional,
+                                        selectedProducts:
+                                            widget.selectedProducts,
+                                        biaya: biaya,
                                       )));
                         } else {
                           null;

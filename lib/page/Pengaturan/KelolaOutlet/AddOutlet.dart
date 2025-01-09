@@ -6,10 +6,14 @@ import 'package:flutter_svg/svg.dart';
 import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:salescheck/Model/User.dart';
+import 'package:salescheck/Service/ApiOutlet.dart';
+import 'package:salescheck/Service/ApiPegawai.dart';
 import 'package:salescheck/component/customButtonColor.dart';
 import 'package:salescheck/component/customDropDown.dart';
 import 'package:salescheck/component/inputTextField.dart';
 
+import '../../../Service/Api.dart';
 import '../../../component/customButtonPrimary.dart';
 
 class Addoutlet extends StatefulWidget {
@@ -20,10 +24,14 @@ class Addoutlet extends StatefulWidget {
 }
 
 class _AddoutletState extends State<Addoutlet> {
+  // final Api _api = new Api();
+  final Apioutlet _api = new Apioutlet();
+  final Apipegawai _apipegawai = new Apipegawai();
   File? _image;
   bool permissionGalery = false;
   bool info = true;
   int stepindex = 1;
+  int? idKoordinator;
   List<String> step = [
     'Detail cabang',
     'Pilih koordinator cabang',
@@ -39,30 +47,24 @@ class _AddoutletState extends State<Addoutlet> {
   String? selectCoordinator;
   FocusNode _focusNodeName = FocusNode();
   FocusNode _focusNodealamat = FocusNode();
-  List<String> koordinatorOptions = [
-    'AmigoSniper',
-    'Santoso',
-    'Tosuhinken',
-    'Zhongli'
-  ];
+  List<User> userkoordinatorOptions = [];
+  List<String> koordinatorOptions = [];
 
   Future<void> _requestPermission() async {
     PermissionStatus status = await Permission.manageExternalStorage.status;
-    print('Memnita permission');
+
     if (status.isDenied || status.isPermanentlyDenied) {
       await Permission.manageExternalStorage.request();
-      print('Ditolak permission');
+
       // _showPermissionDialog(); // Tampilkan Alert Dialog jika izin ditolak
       setState(() {
         permissionGalery = false;
       });
     } else if (status.isGranted) {
-      print('Diterima permission');
       setState(() {
         permissionGalery = true;
       });
     } else {
-      print('Memnita ulang permission');
       await Permission.photos.request(); // Meminta izin
       if (await Permission.photos.isGranted) {
         _pickImage(); // Lanjutkan jika izin diberikan setelah diminta
@@ -136,11 +138,34 @@ class _AddoutletState extends State<Addoutlet> {
     return null;
   }
 
+  Future<void> _readAndPrintPegawaiData() async {
+    userkoordinatorOptions = await _apipegawai.getPegawaiApi();
+
+    if (_apipegawai.statusCode == 200) {
+      setState(() {
+        for (var element in userkoordinatorOptions) {
+          koordinatorOptions.add(element.name);
+        }
+      });
+    } else {}
+  }
+
+  Future<void> selectKoordinator() async {
+    final koordinator = userkoordinatorOptions.firstWhere(
+      (koordinator) => koordinator.name == selectCoordinator,
+    );
+
+    // Ambil id_outlet
+    setState(() {
+      idKoordinator = koordinator.id;
+    });
+  }
+
   @override
   void initState() {
     // TODO: implement initState
     super.initState();
-
+    _readAndPrintPegawaiData();
     _requestPermission();
     _focusNodeName.addListener(() {
       setState(() {
@@ -232,7 +257,13 @@ class _AddoutletState extends State<Addoutlet> {
                     child: customButtonPrimary(
                         alignment: Alignment.center,
                         height: 48,
-                        onPressed: () {
+                        onPressed: () async {
+                          await _api.addOutletApi(
+                              nama: namecontroler.text,
+                              alamat: alamatcontroler.text,
+                              image: _image,
+                              KoordinatorId: idKoordinator,
+                              syaratKetentuan: true);
                           Navigator.pop(context);
                           Navigator.pop(
                               context, 'Berhasil menambahkan cabang baru');
@@ -583,9 +614,10 @@ class _AddoutletState extends State<Addoutlet> {
                                               onChanged: (p0) {
                                                 setState(() {
                                                   selectCoordinator = p0;
+                                                  selectKoordinator();
                                                 });
                                               },
-                                              hintText: 'Pilih Kategori',
+                                              hintText: 'Pilih Koordinator',
                                               heightItem: 50)
                                         ],
                                       ),

@@ -1,14 +1,21 @@
 import 'package:avatar_plus/avatar_plus.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:salescheck/Model/Pegawai.dart';
+import 'package:salescheck/Service/ApiPegawai.dart';
+import 'package:salescheck/component/customButtonColor.dart';
+import 'package:salescheck/component/notifError.dart';
+import 'package:salescheck/component/notifSucces.dart';
 import 'package:salescheck/component/searchBar.dart';
 import 'package:salescheck/page/Pengaturan/Pegawai/addPegawai.dart';
 import 'package:salescheck/page/Pengaturan/Pegawai/editPegawai.dart';
 import 'package:toastification/toastification.dart';
 
+import '../../../Model/User.dart';
 import '../../../component/customButtonPrimary.dart';
 
 class pegawaiPage extends StatefulWidget {
@@ -19,90 +26,33 @@ class pegawaiPage extends StatefulWidget {
 }
 
 class _pegawaiPageState extends State<pegawaiPage> {
+  final Apipegawai _apipegawai = Apipegawai();
   TextEditingController search = new TextEditingController();
   String searchQuery = '';
   List<Pegawai> listPegawai = [];
   List<Pegawai> listPegawaisearch = [];
+  List<User> listUser = [];
+  List<User> listUsersearch = [];
+  late Future<void> _loadDataFuture;
+  Future<void> _readAndPrintPegawaiData() async {
+    listUser = await _apipegawai.getPegawaiApi();
+    if (_apipegawai.statusCode == 200 || _apipegawai.statusCode == 201) {
+      setState(() {
+        listUsersearch = listUser;
+      });
+    } else {
+      Notiferror.showNotif(context: context, description: _apipegawai.message);
+    }
+  }
 
   Future<void> _refreshData() async {
     // Simulasi delay untuk menunggu data baru
     await Future.delayed(const Duration(seconds: 2));
     listPegawai.clear();
+    listUser.clear();
     // Perbarui data dan setState untuk memperbarui tampilan
+    _readAndPrintPegawaiData();
     setState(() {
-      listPegawai = [
-        Pegawai(
-            noPegawai: "001",
-            name: "Andi Santoso",
-            email: "andi.santoso@company.com",
-            role: "Manajer",
-            photo: "https://example.com/photos/andi.jpg",
-            status: true),
-        Pegawai(
-            noPegawai: "002",
-            name: "Budi Wijaya",
-            email: "budi.wijaya@company.com",
-            role: "Staff",
-            photo: "https://example.com/photos/budi.jpg",
-            status: true),
-        Pegawai(
-            noPegawai: "003",
-            name: "Citra Purnama",
-            email: "citra.purnama@company.com",
-            role: "Supervisor",
-            photo: "https://example.com/photos/citra.jpg",
-            status: true),
-        Pegawai(
-            noPegawai: "004",
-            name: "Dewi Ayu",
-            email: "dewi.ayu@company.com",
-            role: "Staff",
-            photo: "https://example.com/photos/dewi.jpg",
-            status: false),
-        Pegawai(
-            noPegawai: "005",
-            name: "Eka Pratama",
-            email: "eka.pratama@company.com",
-            role: "HR",
-            photo: "https://example.com/photos/eka.jpg",
-            status: true),
-        Pegawai(
-            noPegawai: "006",
-            name: "Fajar Maulana",
-            email: "fajar.maulana@company.com",
-            role: "Staff",
-            photo: "https://example.com/photos/fajar.jpg",
-            status: false),
-        Pegawai(
-            noPegawai: "007",
-            name: "Gita Larasati",
-            email: "gita.larasati@company.com",
-            role: "Supervisor",
-            photo: "https://example.com/photos/gita.jpg",
-            status: true),
-        Pegawai(
-            noPegawai: "008",
-            name: "Hendra Saputra",
-            email: "hendra.saputra@company.com",
-            role: "Staff",
-            photo: "https://example.com/photos/hendra.jpg",
-            status: true),
-        Pegawai(
-            noPegawai: "009",
-            name: "Ika Rahmadani",
-            email: "ika.rahmadani@company.com",
-            role: "Manager",
-            photo: "https://example.com/photos/ika.jpg",
-            status: false),
-        Pegawai(
-            noPegawai: "010",
-            name: "Joko Susilo",
-            email: "joko.susilo@company.com",
-            role: "Admin",
-            photo: "https://example.com/photos/joko.jpg",
-            status: true),
-      ];
-      listPegawaisearch = listPegawai;
       search.clear();
       searchQuery = '';
     });
@@ -110,16 +60,15 @@ class _pegawaiPageState extends State<pegawaiPage> {
 
   void searchfunction() {
     if (searchQuery.isNotEmpty) {
-      listPegawaisearch = listPegawai;
+      listUsersearch = listUser;
       setState(() {
-        listPegawaisearch = listPegawaisearch
+        listUsersearch = listUsersearch
             .where((item) =>
-                item.name.toLowerCase().contains(searchQuery.toLowerCase()))
+                item.name.toLowerCase().startsWith(searchQuery.toLowerCase()))
             .toList();
       });
-      print(listPegawai.length);
     } else {
-      listPegawaisearch = listPegawai;
+      listUsersearch = listUser;
     }
   }
 
@@ -128,7 +77,7 @@ class _pegawaiPageState extends State<pegawaiPage> {
       switch (role.toLowerCase()) {
         case 'admin':
           return const Color(0xFFF0F9FF);
-        case 'manajer':
+        case 'manager':
           return const Color(0xFFECFDF5);
         case 'kasir':
           return const Color(0xFFFFFBEB);
@@ -147,7 +96,7 @@ class _pegawaiPageState extends State<pegawaiPage> {
       switch (role.toLowerCase()) {
         case 'admin':
           return const Color(0xFF0EA5E9);
-        case 'manajer':
+        case 'manager':
           return const Color(0xFF10B981);
         case 'kasir':
           return const Color(0xFFF59E0B);
@@ -163,7 +112,8 @@ class _pegawaiPageState extends State<pegawaiPage> {
 
   void notif(String title) {
     toastification.show(
-        margin: const EdgeInsets.only(right: 15),
+        alignment: Alignment.topCenter,
+        margin: const EdgeInsets.only(right: 16, left: 16),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         autoCloseDuration: const Duration(seconds: 8),
         progressBarTheme: const ProgressIndicatorThemeData(
@@ -196,14 +146,18 @@ class _pegawaiPageState extends State<pegawaiPage> {
         ));
   }
 
-  void _quickAccesForm(BuildContext context, Pegawai pegawai) {
+  void _quickAccesForm(BuildContext context, User user, bool status) {
     showModalBottomSheet(
-      backgroundColor: const Color(0xFFFBFBFB),
+      isDismissible: false,
+      backgroundColor: const Color(0xFFFFFFFF),
       context: context,
       isScrollControlled: true,
       builder: (BuildContext context) {
+        bool imageNull = user.image == null;
+
         return StatefulBuilder(
           builder: (context, StateSetter setModalState) {
+            bool close = true;
             return Padding(
               padding: const EdgeInsets.only(
                   top: 16, right: 16, bottom: 24, left: 16),
@@ -217,7 +171,7 @@ class _pegawaiPageState extends State<pegawaiPage> {
                     color: const Color(0xFFE9E9E9),
                     margin: const EdgeInsets.only(bottom: 16),
                   ),
-                  pegawai.status
+                  status
                       ? const SizedBox.shrink()
                       : Container(
                           margin: const EdgeInsets.only(bottom: 16),
@@ -265,10 +219,49 @@ class _pegawaiPageState extends State<pegawaiPage> {
                             borderRadius: BorderRadius.all(Radius.circular(10)),
                             color: Colors.transparent,
                           ),
-                          child: AvatarPlus(
-                            pegawai.name,
-                            fit: BoxFit.contain,
-                          ),
+                          child: imageNull
+                              ? AvatarPlus(
+                                  user.name,
+                                  fit: BoxFit.contain,
+                                )
+                              : ClipRRect(
+                                  borderRadius: const BorderRadius.all(
+                                      Radius.circular(100)),
+                                  child: CachedNetworkImage(
+                                    fit: BoxFit.cover,
+                                    imageUrl:
+                                        _apipegawai.getImage(user.image ?? ''),
+                                    progressIndicatorBuilder:
+                                        (context, url, progress) {
+                                      return Center(
+                                          child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          CircularProgressIndicator(
+                                            value: progress.totalSize != null
+                                                ? progress.downloaded /
+                                                    (progress.totalSize ?? 1)
+                                                : null,
+                                          ),
+                                          if (progress.totalSize != null)
+                                            Text(
+                                              '${(progress.downloaded / 1000000).toStringAsFixed(2)} / ${(progress.totalSize! / 1000000).toStringAsFixed(2)} MB',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black,
+                                              ),
+                                            ),
+                                        ],
+                                      ));
+                                    },
+                                    errorWidget: (context, url, error) =>
+                                        const Icon(Icons.error),
+                                  ),
+                                ),
                         ),
                         Container(
                           width: 187,
@@ -292,16 +285,14 @@ class _pegawaiPageState extends State<pegawaiPage> {
                                         borderRadius: const BorderRadius.all(
                                             Radius.circular(100)),
                                         color: getRoleColorBackground(
-                                            pegawai.role, pegawai.status)),
+                                            user.role, status)),
                                     child: Text(
-                                      pegawai.status
-                                          ? pegawai.role
-                                          : 'Nonaktif',
+                                      status ? user.role : 'Nonaktif',
                                       maxLines: 1,
                                       overflow: TextOverflow.clip,
                                       style: TextStyle(
                                           color: getRoleColorFont(
-                                              pegawai.role, pegawai.status),
+                                              user.role, status),
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500),
                                     ),
@@ -312,7 +303,7 @@ class _pegawaiPageState extends State<pegawaiPage> {
                                 height: 12,
                               ),
                               Text(
-                                pegawai.name,
+                                user.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -324,7 +315,7 @@ class _pegawaiPageState extends State<pegawaiPage> {
                                 height: 12,
                               ),
                               Text(
-                                pegawai.email,
+                                user.email,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
@@ -362,13 +353,19 @@ class _pegawaiPageState extends State<pegawaiPage> {
                                           activeColor: const Color(0xFF10B981),
                                           trackColor: const Color(0xFFE2E8F0),
                                           thumbColor: const Color(0xFFFFFFFF),
-                                          value: pegawai.status,
-                                          onChanged: (value) {
+                                          value: status,
+                                          onChanged: (value) async {
                                             setModalState(() {
-                                              pegawai.status = value;
+                                              status = value;
+                                              close = false;
                                             });
-                                            setState(() {
-                                              pegawai.status = value;
+                                            await _apipegawai
+                                                .quickeditPegawaitApi(
+                                                    idPegawai: user.id,
+                                                    status: status);
+                                            await _refreshData();
+                                            setModalState(() {
+                                              close = true;
                                             });
                                           },
                                         )),
@@ -381,74 +378,120 @@ class _pegawaiPageState extends State<pegawaiPage> {
                       ],
                     ),
                   ),
+                  GestureDetector(
+                    onTap: () {
+                      if (user.tokenLogin!.isNotEmpty) {
+                        Clipboard.setData(
+                            ClipboardData(text: user.tokenLogin!));
+                        Notifsucces.showNotif(
+                            context: context,
+                            description: 'Token telah disalin');
+                      } else {}
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(top: 12, bottom: 16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.max,
+                        children: [
+                          const Text(
+                            'ID Token',
+                            style: TextStyle(
+                                color: Color(0xFFAAAAAA),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500),
+                          ),
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(top: 8),
+                            padding: const EdgeInsets.all(16),
+                            decoration: const BoxDecoration(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(8)),
+                                color: Color(0xFFF6F6F6)),
+                            child: (user.tokenLogin != null &&
+                                    user.tokenLogin!.isNotEmpty)
+                                ? Text(
+                                    user.tokenLogin!,
+                                    style: const TextStyle(
+                                      color: Color(0xFF09090B),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  )
+                                : const Text(
+                                    'ID Token belum tersedia',
+                                    style: TextStyle(
+                                      color: Color(0xFFAAAAAA),
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                          },
-                          style: ElevatedButton.styleFrom(
-                              shape: const RoundedRectangleBorder(
-                                  borderRadius:
-                                      BorderRadius.all(Radius.circular(12))),
-                              backgroundColor: const Color(0xFFF6F6F6),
-                              foregroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              minimumSize: const Size(167.5, 50)),
-                          child: const Text(
-                            'Kembali',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFF09090B)),
-                          )),
+                      Flexible(
+                          child: CustombuttonColor(
+                              color: const Color(0xFFF6F6F6),
+                              alignment: Alignment.center,
+                              height: 48,
+                              onPressed: () {
+                                if (close == true) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                              child: const Text(
+                                'Kembali',
+                                style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF09090B)),
+                              ))),
                       const SizedBox(
-                        height: 15,
+                        width: 15,
                       ),
-                      customButtonPrimary(
-                          alignment: Alignment.center,
-                          height: 48,
-                          width: 167.5,
-                          onPressed: () async {
-                            Navigator.pop(context);
-                            final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => Editpegawai(
-                                          pegawai: pegawai,
-                                        )));
+                      Flexible(
+                        child: customButtonPrimary(
+                            alignment: Alignment.center,
+                            height: 48,
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (context) => Editpegawai(
+                                            user: user,
+                                          )));
 
-                            if (result != null) {
-                              final message = result['message'];
-                              final isDeleted = result['isDeleted'];
-                              // ignore: use_build_context_synchronously
+                              if (result != null) {
+                                final message = result['message'];
+                                final isDeleted = result['isDeleted'];
+                                // ignore: use_build_context_synchronously
 
-                              print(message);
-                              print(isDeleted);
-                              if (isDeleted == true) {
-                                setState(() {
-                                  //delete item
-
-                                  // outlet.removeWhere(
-                                  //     (item) => item.noCab == outlet.noCabang);
-                                  listPegawaisearch.removeWhere((item) =>
-                                      item.noPegawai == pegawai.noPegawai);
-                                });
-                                notif(message);
-                              } else {
-                                notif(message);
+                                if (isDeleted == true) {
+                                  notif(message);
+                                } else {
+                                  notif(message);
+                                }
+                                _refreshData();
                               }
-                            }
-                          },
-                          child: const Text(
-                            'Edit Pengguna',
-                            style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: Color(0xFFFFFFFF)),
-                          ))
+                            },
+                            child: const Text(
+                              'Edit Pengguna',
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFFFFFFFF)),
+                            )),
+                      )
                     ],
                   )
                 ],
@@ -464,6 +507,7 @@ class _pegawaiPageState extends State<pegawaiPage> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    _loadDataFuture = _readAndPrintPegawaiData();
   }
 
   @override
@@ -494,12 +538,10 @@ class _pegawaiPageState extends State<pegawaiPage> {
                   child: Searchbar(
                       hintText: 'Cari Pegawai',
                       onChanged: (p0) {
-                        print('cari');
                         setState(() {
                           searchQuery = search.text;
                         });
                         searchfunction();
-                        print('hasil');
                       },
                       controller: search)),
               Expanded(
@@ -508,175 +550,261 @@ class _pegawaiPageState extends State<pegawaiPage> {
                     RefreshIndicator(
                       onRefresh: _refreshData,
                       child: SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: listPegawaisearch.isEmpty
-                            ? Container(
-                                alignment: Alignment.center,
-                                height: 375,
-                                width: 375,
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.max,
-                                  children: [
-                                    SvgPicture.asset(
-                                      'asset/pegawai/Group 33979.svg',
-                                      width: 105,
-                                      height: 105,
-                                    ),
-                                    const SizedBox(
-                                      height: 12,
-                                    ),
-                                    const Text(
-                                      'Belum ada data pegawai tersedia',
-                                      style: TextStyle(
-                                          color: Color(0xFFB1B5C0),
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w500),
-                                    )
-                                  ],
-                                ))
-                            : MasonryGridView.count(
-                                physics: const NeverScrollableScrollPhysics(),
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 16, horizontal: 16),
-                                shrinkWrap: true,
-                                crossAxisCount: 2,
-                                crossAxisSpacing: 10,
-                                mainAxisSpacing: 10,
-                                itemCount: listPegawaisearch.length,
-                                itemBuilder: (context, index) {
-                                  return GestureDetector(
-                                    onTap: () {
-                                      _quickAccesForm(
-                                          context, listPegawaisearch[index]);
-                                    },
-                                    child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 16, horizontal: 16),
-                                        decoration: BoxDecoration(
-                                            color:
-                                                listPegawaisearch[index].status
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: FutureBuilder<void>(
+                            future: _loadDataFuture,
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState ==
+                                  ConnectionState.waiting) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              } else if (snapshot.hasError) {
+                                return Center(
+                                  child: Text('Error: ${snapshot.error}'),
+                                );
+                              } else {
+                                if (listUsersearch.isEmpty) {
+                                  return Container(
+                                      alignment: Alignment.center,
+                                      height: 375,
+                                      width: 375,
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.max,
+                                        children: [
+                                          SvgPicture.asset(
+                                            'asset/pegawai/Group 33979.svg',
+                                            width: 105,
+                                            height: 105,
+                                          ),
+                                          const SizedBox(
+                                            height: 12,
+                                          ),
+                                          const Text(
+                                            'Belum ada data pegawai tersedia',
+                                            style: TextStyle(
+                                                color: Color(0xFFB1B5C0),
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w500),
+                                          )
+                                        ],
+                                      ));
+                                } else {
+                                  return MasonryGridView.count(
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16, horizontal: 16),
+                                    shrinkWrap: true,
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 10,
+                                    mainAxisSpacing: 10,
+                                    itemCount: listUsersearch.length,
+                                    itemBuilder: (context, index) {
+                                      bool statusPegawai =
+                                          listUsersearch[index].status ==
+                                                  'Active'
+                                              ? true
+                                              : false;
+                                      bool imageNull =
+                                          listUsersearch[index].image == null;
+
+                                      return GestureDetector(
+                                        onTap: () {
+                                          _quickAccesForm(
+                                              context,
+                                              listUsersearch[index],
+                                              statusPegawai);
+                                        },
+                                        child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 16, horizontal: 16),
+                                            decoration: BoxDecoration(
+                                                color: statusPegawai
                                                     ? const Color(0xFFFFFFFF)
                                                     : const Color(0xFFEAEAED),
-                                            borderRadius:
-                                                const BorderRadius.all(
-                                                    Radius.circular(0))),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.center,
-                                          children: [
-                                            SizedBox(
-                                                height: 75,
-                                                width: 75,
-                                                child: Stack(
+                                                borderRadius:
+                                                    const BorderRadius.all(
+                                                        Radius.circular(0))),
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
+                                              children: [
+                                                SizedBox(
+                                                    height: 75,
+                                                    width: 75,
+                                                    child: Stack(
+                                                      alignment:
+                                                          Alignment.center,
+                                                      children: [
+                                                        imageNull
+                                                            ? AvatarPlus(
+                                                                listUsersearch[
+                                                                        index]
+                                                                    .name,
+                                                                fit: BoxFit
+                                                                    .contain,
+                                                              )
+                                                            : ClipRRect(
+                                                                borderRadius:
+                                                                    const BorderRadius
+                                                                        .all(
+                                                                        Radius.circular(
+                                                                            100)),
+                                                                child:
+                                                                    CachedNetworkImage(
+                                                                  fit: BoxFit
+                                                                      .cover,
+                                                                  width: 75,
+                                                                  height: 75,
+                                                                  imageUrl: _apipegawai
+                                                                      .getImage(
+                                                                          listUsersearch[index].image ??
+                                                                              ''),
+                                                                  progressIndicatorBuilder:
+                                                                      (context,
+                                                                          url,
+                                                                          progress) {
+                                                                    return Center(
+                                                                        child:
+                                                                            Column(
+                                                                      mainAxisAlignment:
+                                                                          MainAxisAlignment
+                                                                              .center,
+                                                                      crossAxisAlignment:
+                                                                          CrossAxisAlignment
+                                                                              .center,
+                                                                      children: [
+                                                                        CircularProgressIndicator(
+                                                                          value: progress.totalSize != null
+                                                                              ? progress.downloaded / (progress.totalSize ?? 1)
+                                                                              : null,
+                                                                        ),
+                                                                        Text(
+                                                                          '${(progress.downloaded / 1000000).toStringAsFixed(2)} / ${(progress.totalSize! / 1000000).toStringAsFixed(2)} MB',
+                                                                          style: const TextStyle(
+                                                                              fontSize: 12,
+                                                                              fontWeight: FontWeight.w500,
+                                                                              color: Colors.black),
+                                                                        ),
+                                                                      ],
+                                                                    ));
+                                                                  },
+                                                                  errorWidget: (context,
+                                                                          url,
+                                                                          error) =>
+                                                                      const Icon(
+                                                                          Icons
+                                                                              .error),
+                                                                ),
+                                                              ),
+                                                        Positioned(
+                                                          bottom: 0,
+                                                          child: Container(
+                                                            alignment: Alignment
+                                                                .center,
+                                                            height: 24,
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .symmetric(
+                                                                    vertical: 4,
+                                                                    horizontal:
+                                                                        12),
+                                                            decoration: BoxDecoration(
+                                                                borderRadius:
+                                                                    const BorderRadius
+                                                                        .all(
+                                                                        Radius.circular(
+                                                                            100)),
+                                                                color: getRoleColorBackground(
+                                                                    listUsersearch[
+                                                                            index]
+                                                                        .role,
+                                                                    statusPegawai)),
+                                                            child: Text(
+                                                              statusPegawai
+                                                                  ? listUsersearch[
+                                                                          index]
+                                                                      .role
+                                                                  : 'Nonaktif',
+                                                              maxLines: 1,
+                                                              overflow:
+                                                                  TextOverflow
+                                                                      .clip,
+                                                              style: TextStyle(
+                                                                  color: getRoleColorFont(
+                                                                      listUsersearch[
+                                                                              index]
+                                                                          .role,
+                                                                      statusPegawai),
+                                                                  fontSize: 12,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500),
+                                                            ),
+                                                          ),
+                                                        )
+                                                      ],
+                                                    )),
+                                                const SizedBox(
+                                                  height: 16,
+                                                ),
+                                                Container(
                                                   alignment: Alignment.center,
-                                                  children: [
-                                                    AvatarPlus(
-                                                      listPegawaisearch[index]
-                                                          .name,
-                                                      fit: BoxFit.contain,
-                                                    ),
-                                                    Positioned(
-                                                      bottom: 0,
-                                                      child: Container(
-                                                        alignment:
-                                                            Alignment.center,
-                                                        height: 24,
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                                vertical: 4,
-                                                                horizontal: 12),
-                                                        decoration: BoxDecoration(
-                                                            borderRadius:
-                                                                const BorderRadius
-                                                                    .all(
-                                                                    Radius.circular(
-                                                                        100)),
-                                                            color: getRoleColorBackground(
-                                                                listPegawaisearch[
-                                                                        index]
-                                                                    .role,
-                                                                listPegawaisearch[
-                                                                        index]
-                                                                    .status)),
-                                                        child: Text(
-                                                          listPegawaisearch[
-                                                                      index]
-                                                                  .status
-                                                              ? listPegawaisearch[
-                                                                      index]
-                                                                  .role
-                                                              : 'Nonaktif',
-                                                          maxLines: 1,
-                                                          overflow:
-                                                              TextOverflow.clip,
-                                                          style: TextStyle(
-                                                              color: getRoleColorFont(
-                                                                  listPegawaisearch[
-                                                                          index]
-                                                                      .role,
-                                                                  listPegawaisearch[
-                                                                          index]
-                                                                      .status),
-                                                              fontSize: 12,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w500),
-                                                        ),
+                                                  child: Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      Text(
+                                                        listUsersearch[index]
+                                                            .name,
+                                                        style: const TextStyle(
+                                                            color: Color(
+                                                                0xFF0B0C17),
+                                                            fontSize: 14,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w600),
                                                       ),
-                                                    )
-                                                  ],
-                                                )),
-                                            const SizedBox(
-                                              height: 16,
-                                            ),
-                                            Container(
-                                              alignment: Alignment.center,
-                                              child: Column(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.center,
-                                                children: [
-                                                  Text(
-                                                    listPegawaisearch[index]
-                                                        .name,
-                                                    style: const TextStyle(
-                                                        color:
-                                                            Color(0xFF0B0C17),
-                                                        fontSize: 14,
-                                                        fontWeight:
-                                                            FontWeight.w600),
+                                                      const SizedBox(
+                                                        height: 4,
+                                                      ),
+                                                      Text(
+                                                        listUsersearch[index]
+                                                            .email,
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                        style: const TextStyle(
+                                                            color: Color(
+                                                                0xFFA3A3A3),
+                                                            fontSize: 12,
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .w500),
+                                                      ),
+                                                    ],
                                                   ),
-                                                  const SizedBox(
-                                                    height: 4,
-                                                  ),
-                                                  Text(
-                                                    listPegawaisearch[index]
-                                                        .email,
-                                                    maxLines: 1,
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                    style: const TextStyle(
-                                                        color:
-                                                            Color(0xFFA3A3A3),
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.w500),
-                                                  ),
-                                                ],
-                                              ),
-                                            )
-                                          ],
-                                        )),
+                                                )
+                                              ],
+                                            )),
+                                      );
+                                    },
                                   );
-                                },
-                              ),
-                      ),
+                                }
+                              }
+                            },
+                          )),
                     ),
                     Align(
                         alignment: Alignment.bottomCenter,
@@ -694,6 +822,7 @@ class _pegawaiPageState extends State<pegawaiPage> {
                                               const Addpegawai()));
                                   if (result != null) {
                                     notif(result);
+                                    _refreshData();
                                   }
                                 },
                                 child: Container(

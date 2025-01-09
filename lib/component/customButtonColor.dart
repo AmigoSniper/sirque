@@ -6,6 +6,7 @@ class CustombuttonColor extends StatelessWidget {
   final AlignmentGeometry? alignment;
   final double? height;
   final double? width;
+  final BoxBorder? border;
   final EdgeInsetsGeometry? padding;
   final EdgeInsetsGeometry? margin;
   final BoxDecoration? decoration;
@@ -26,7 +27,8 @@ class CustombuttonColor extends StatelessWidget {
       this.gradient,
       this.color,
       this.borderRadius,
-      this.constraints});
+      this.constraints,
+      this.border});
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -39,6 +41,7 @@ class CustombuttonColor extends StatelessWidget {
           margin: margin,
           constraints: constraints,
           decoration: BoxDecoration(
+            border: border,
             color: color,
             borderRadius: borderRadius ?? BorderRadius.circular(12),
           ),

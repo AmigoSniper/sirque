@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:animated_snack_bar/animated_snack_bar.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -12,16 +13,28 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:salescheck/component/customButtonPrimary.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../Model/category.dart';
+import '../../Service/ApiCategory.dart';
+import '../../Service/ApiProduct.dart';
+import '../../component/customButtonColor.dart';
 import '../../component/customDropDown.dart';
 import '../../component/inputTextField.dart';
 
 class Editbarang extends StatefulWidget {
+  final int idProduct;
   final String name;
   final String deskripis;
+  final int categoryRelasi;
   final int harga;
   final String category;
+  final int imageRelasi;
   final String imageUrl;
+  final int idOutlet;
+  final int stock;
+  final bool unlimitedStock;
 
   const Editbarang(
       {super.key,
@@ -29,13 +42,23 @@ class Editbarang extends StatefulWidget {
       required this.deskripis,
       required this.harga,
       required this.imageUrl,
-      required this.category});
+      required this.category,
+      required this.unlimitedStock,
+      required this.idOutlet,
+      required this.idProduct,
+      required this.stock,
+      required this.categoryRelasi,
+      required this.imageRelasi});
 
   @override
   State<Editbarang> createState() => _EditbarangState();
 }
 
 class _EditbarangState extends State<Editbarang> {
+  int? idCategory;
+  final Apicategory _api = Apicategory();
+  final Apiproduct _apiproduct = Apiproduct();
+  List<Category> categoryOption = [Category()];
   final numberFormat = NumberFormat('#,##0', 'id');
   File? _image;
   bool permissionGalery = false;
@@ -56,25 +79,23 @@ class _EditbarangState extends State<Editbarang> {
   FocusNode _focusNodeharga = FocusNode();
   FocusNode _focusNodestock = FocusNode();
   String? selectedKategori;
-  List<String> kategoriOptions = ['Bola Olahraga', 'Raket', 'Sepatu', 'Kaos'];
+  List<String> kategoriOptions = [];
 
   Future<void> _requestPermission() async {
     PermissionStatus status = await Permission.manageExternalStorage.status;
-    print('Memnita permission');
+
     if (status.isDenied || status.isPermanentlyDenied) {
       await Permission.manageExternalStorage.request();
-      print('Ditolak permission');
+
       // _showPermissionDialog(); // Tampilkan Alert Dialog jika izin ditolak
       setState(() {
         permissionGalery = false;
       });
     } else if (status.isGranted) {
-      print('Diterima permission');
       setState(() {
         permissionGalery = true;
       });
     } else {
-      print('Memnita ulang permission');
       await Permission.photos.request(); // Meminta izin
       if (await Permission.photos.isGranted) {
         _pickImage(); // Lanjutkan jika izin diberikan setelah diminta
@@ -148,7 +169,15 @@ class _EditbarangState extends State<Editbarang> {
     return null;
   }
 
-  void _showForm(BuildContext context, String namaBarang) {
+  void _showForm(
+      BuildContext context,
+      int productId,
+      String nama,
+      String description,
+      double price,
+      int idCategory,
+      int idoutlet,
+      bool unlimitedStock) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -160,7 +189,7 @@ class _EditbarangState extends State<Editbarang> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Apakah anda yakin ingin menyimpan produk $namaBarang?',
+                'Apakah anda yakin ingin menyimpan produk $nama?',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     fontSize: 16,
@@ -171,12 +200,23 @@ class _EditbarangState extends State<Editbarang> {
                 height: 30,
               ),
               ElevatedButton(
-                  onPressed: () {
+                  onPressed: () async {
+                    await _apiproduct.editProductApi(
+                        image: _image,
+                        productId: productId,
+                        nama: nama,
+                        description: description,
+                        price: price,
+                        idCategory: idCategory,
+                        idOutlet: idoutlet,
+                        unlimitedStock: unlimitedStock,
+                        idRelasiImage: widget.imageRelasi,
+                        idRelasiCategory: widget.categoryRelasi);
                     Navigator.pop(context);
                     Navigator.pop(
                       context,
                       {
-                        'message': 'Barang $namaBarang berhasil disimpan!',
+                        'message': 'Barang $nama berhasil disimpan!',
                         'isDeleted': false,
                       },
                     );
@@ -221,6 +261,30 @@ class _EditbarangState extends State<Editbarang> {
     );
   }
 
+  Future<void> _readAndPrintCategoryData() async {
+    final prefs = await SharedPreferences.getInstance();
+    categoryOption = await _api.getCategory();
+    if (_api.statusCode == 200) {
+      setState(() {
+        for (var element in categoryOption) {
+          kategoriOptions.add(element.namaKategori!);
+        }
+      });
+    } else {}
+  }
+
+  Future<void> selectCategory() async {
+    final category = categoryOption.firstWhere(
+      (category) => category.namaKategori == selectedKategori,
+      orElse: () => Category(),
+    );
+
+    // Ambil id_outlet
+    setState(() {
+      idCategory = category.idKategori;
+    });
+  }
+
   void _deleteForm(BuildContext context, String namaBarang) {
     showModalBottomSheet(
       context: context,
@@ -232,6 +296,12 @@ class _EditbarangState extends State<Editbarang> {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                width: 50,
+                height: 4,
+                color: const Color(0xFFE9E9E9),
+                margin: const EdgeInsets.only(bottom: 16),
+              ),
               Text(
                 'Apakah anda yakin ingin menghapus produk $namaBarang?',
                 textAlign: TextAlign.center,
@@ -246,53 +316,52 @@ class _EditbarangState extends State<Editbarang> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.max,
                 children: [
-                  ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                      },
-                      style: ElevatedButton.styleFrom(
-                          shape: const RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(48))),
-                          backgroundColor: Colors.transparent,
-                          foregroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          minimumSize: const Size(167.5, 50)),
-                      child: const Text(
-                        'Tidak, batal',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF09090B)),
-                      )),
-                  const SizedBox(
-                    height: 15,
-                  ),
-                  ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.pop(
-                          context,
-                          {
-                            'message': '$namaBarang berhasil dihapus!',
-                            'isDeleted': true,
+                  Flexible(
+                      child: CustombuttonColor(
+                          height: 48,
+                          alignment: Alignment.center,
+                          color: const Color(0xFFF7F7F7),
+                          onPressed: () {
+                            Navigator.pop(context);
                           },
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                          shape: const RoundedRectangleBorder(
-                              borderRadius:
-                                  BorderRadius.all(Radius.circular(48))),
-                          backgroundColor: const Color(0xFFFF3E1D),
-                          minimumSize: const Size(167.5, 50)),
-                      child: const Text(
-                        'Ya, hapus',
-                        style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFFFFFF)),
-                      )),
+                          child: const Text(
+                            'Tidak, batal',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF09090B)),
+                          ))),
+                  const SizedBox(
+                    width: 8,
+                  ),
+                  Flexible(
+                      child: CustombuttonColor(
+                          height: 48,
+                          alignment: Alignment.center,
+                          color: const Color(0xFFFF3E1D),
+                          onPressed: () async {
+                            await _apiproduct.deleteProduct(widget.idProduct);
+                            if (_apiproduct.statusCode == 204 ||
+                                _apiproduct.statusCode == 201) {
+                              Navigator.pop(context);
+                              Navigator.pop(
+                                context,
+                                {
+                                  'message': '$namaBarang berhasil dihapus!',
+                                  'isDeleted': true,
+                                },
+                              );
+                            } else {}
+                          },
+                          child: const Text(
+                            'Ya, saya yakin',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFFFFFFF)),
+                          )))
                 ],
               )
             ],
@@ -317,6 +386,7 @@ class _EditbarangState extends State<Editbarang> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    _readAndPrintCategoryData();
     namecontroler.text = widget.name;
     deskripsicontroler.text = widget.deskripis;
     selectedKategori = widget.category;
@@ -525,8 +595,8 @@ class _EditbarangState extends State<Editbarang> {
                                                           padding:
                                                               EdgeInsets.zero,
                                                           decoration: BoxDecoration(
-                                                              color:
-                                                                  Colors.blue,
+                                                              color: Colors
+                                                                  .transparent,
                                                               borderRadius:
                                                                   BorderRadius
                                                                       .circular(
@@ -548,12 +618,36 @@ class _EditbarangState extends State<Editbarang> {
                                                                       .darken,
                                                                 ),
                                                                 child:
-                                                                    Image.asset(
-                                                                  'asset/barang/Rectangle 894.png',
+                                                                    CachedNetworkImage(
                                                                   fit: BoxFit
                                                                       .cover,
                                                                   width: 105,
                                                                   height: 105,
+                                                                  imageUrl: _apiproduct
+                                                                      .getImage(
+                                                                          widget
+                                                                              .imageUrl),
+                                                                  progressIndicatorBuilder:
+                                                                      (context,
+                                                                          url,
+                                                                          progress) {
+                                                                    return Center(
+                                                                      child:
+                                                                          CircularProgressIndicator(
+                                                                        value: progress.totalSize !=
+                                                                                null
+                                                                            ? progress.downloaded /
+                                                                                (progress.totalSize ?? 1)
+                                                                            : null,
+                                                                      ),
+                                                                    );
+                                                                  },
+                                                                  errorWidget: (context,
+                                                                          url,
+                                                                          error) =>
+                                                                      const Icon(
+                                                                          Icons
+                                                                              .error),
                                                                 ),
                                                               ))),
                                                       SizedBox(
@@ -615,6 +709,7 @@ class _EditbarangState extends State<Editbarang> {
                                         onChanged: (String? value) {
                                           setState(() {
                                             selectedKategori = value;
+                                            selectCategory();
                                           });
                                         },
                                         hintText: 'Pilih kategori',
@@ -673,9 +768,9 @@ class _EditbarangState extends State<Editbarang> {
                                   if (validForm()) {
                                     String harganya = hargacontroler.text
                                         .replaceAll(RegExp(r'[^\d]'), '');
-                                    print(harganya);
+
                                     int hargatotal = int.parse(harganya);
-                                    print(hargatotal + 10000);
+
                                     _deleteForm(context, namecontroler.text);
                                   } else {
                                     AnimatedSnackBar.material(
@@ -712,43 +807,44 @@ class _EditbarangState extends State<Editbarang> {
           Align(
               alignment: Alignment.bottomCenter,
               child: Container(
-                decoration: const BoxDecoration(color: Color(0xFFF6F8FA)),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                child: ElevatedButton(
-                    onPressed: () {
-                      if (validForm()) {
-                        String harganya = hargacontroler.text
-                            .replaceAll(RegExp(r'[^\d]'), '');
-                        print(harganya);
-                        int hargatotal = int.parse(harganya);
-                        print(hargatotal + 10000);
-                        _showForm(context, namecontroler.text);
-                      } else {
-                        AnimatedSnackBar.material(
-                          'Pastikan data sudaht terisi!',
-                          type: AnimatedSnackBarType.error,
-                        ).show(context);
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                        shape: const RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.all(Radius.circular(12))),
-                        backgroundColor: validForm()
-                            ? const Color(0xFF00409A)
-                            : const Color(0xFFDEDEDE),
-                        minimumSize: const Size(double.infinity, 50)),
-                    child: Text(
-                      'Simpan',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: validForm()
-                              ? const Color(0xFFFFFFFF)
-                              : const Color(0xFF717179)),
-                    )),
-              ))
+                  decoration: const BoxDecoration(color: Color(0xFFF6F8FA)),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                  child: customButtonPrimary(
+                      height: 50,
+                      alignment: Alignment.center,
+                      onPressed: () {
+                        if (validForm()) {
+                          String harganya = hargacontroler.text
+                              .replaceAll(RegExp(r'[^\d]'), '');
+
+                          double hargatotal = double.parse(harganya);
+
+                          _showForm(
+                              context,
+                              widget.idProduct,
+                              namecontroler.text,
+                              deskripsicontroler.text,
+                              hargatotal,
+                              idCategory ?? 0,
+                              widget.idOutlet,
+                              widget.unlimitedStock);
+                        } else {
+                          AnimatedSnackBar.material(
+                            'Pastikan data sudaht terisi!',
+                            type: AnimatedSnackBarType.error,
+                          ).show(context);
+                        }
+                      },
+                      child: Text(
+                        'Simpan',
+                        style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: validForm()
+                                ? const Color(0xFFFFFFFF)
+                                : const Color(0xFF717179)),
+                      ))))
         ],
       )),
     );

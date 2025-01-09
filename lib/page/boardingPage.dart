@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:salescheck/component/customButtonPrimary.dart';
 
 import 'Login/loginform.dart';
 
@@ -81,7 +82,10 @@ class _BoardingpageState extends State<Boardingpage> {
                           const SizedBox(
                             height: 24,
                           ),
-                          ElevatedButton(
+                          customButtonPrimary(
+                              alignment: Alignment.center,
+                              height: 50,
+                              width: double.infinity,
                               onPressed: () {
                                 Navigator.push(
                                     context,
@@ -89,19 +93,13 @@ class _BoardingpageState extends State<Boardingpage> {
                                         builder: (context) =>
                                             const Loginform()));
                               },
-                              style: ElevatedButton.styleFrom(
-                                  shape: const RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.all(
-                                          Radius.circular(12))),
-                                  backgroundColor: const Color(0xFF0747CB),
-                                  minimumSize: const Size(double.infinity, 50)),
                               child: const Text(
                                 'Mulai',
                                 style: TextStyle(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 16,
                                     color: Color(0xFFFFFFFF)),
-                              )),
+                              ))
                         ],
                       ),
                     ),

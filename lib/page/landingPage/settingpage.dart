@@ -1,29 +1,71 @@
+import 'dart:convert';
+
 import 'package:avatar_plus/avatar_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_svg/flutter_svg.dart' as SvgIcon;
 import 'package:flutter_svg_provider/flutter_svg_provider.dart';
+import 'package:salescheck/Service/ApiPegawai.dart';
 import 'package:salescheck/page/Pengaturan/Account/SetAccount.dart';
 import 'package:salescheck/page/Pengaturan/BiayaTambahan/biayaTambahan.dart';
 import 'package:salescheck/page/Pengaturan/KelolaOutlet/KelolaOutlet.dart';
 import 'package:salescheck/page/Pengaturan/Lainnya/Bantuan.dart';
 import 'package:salescheck/page/Pengaturan/Lainnya/KebijakanPrivasi.dart';
 import 'package:salescheck/page/Pengaturan/Pegawai/pegawaiPage.dart';
+import 'package:salescheck/page/Pengaturan/Pembayaran/pembayaran.dart';
 import 'package:salescheck/page/Pengaturan/Promosi/promosiPage.dart';
 import 'package:salescheck/page/Pengaturan/Struk/Struk.dart';
 import 'package:salescheck/page/Pengaturan/Lainnya/SyaratDanKetentuan.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../Model/UserData.dart';
 
 class Settingpage extends StatefulWidget {
-  const Settingpage({super.key});
+  final bool? permisOutlet;
+  const Settingpage({super.key, this.permisOutlet});
 
   @override
   State<Settingpage> createState() => _SettingpageState();
 }
 
 class _SettingpageState extends State<Settingpage> {
+  final Apipegawai _apipegawai = new Apipegawai();
   ScrollController _scrollController = new ScrollController();
-  String name = 'AmigoSniper';
-  String otority = 'Admin';
+  String name = '';
+  String otority = '';
+  String? imageUrl;
+  UserData? userData;
+  Future<void> _readAndPrintUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // Ambil data yang disimpan sebagai JSON string
+    final data = prefs.getString('userData');
+
+    if (data != null) {
+      // Decode JSON string ke Map<String, dynamic>
+      final jsonData = jsonDecode(data) as Map<String, dynamic>;
+
+      // Parse JSON ke model UserData
+      userData = UserData.fromJson(jsonData);
+
+      // Cetak informasi user
+
+      setState(() {
+        name = userData!.user.name;
+        otority = userData!.user.role;
+      });
+      imageUrl = await userData!.user.image!;
+    } else {}
+  }
+
+  @override
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    _readAndPrintUserData();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -73,29 +115,57 @@ class _SettingpageState extends State<Settingpage> {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              CircleAvatar(
-                                child: AvatarPlus(
-                                  'AmigoSniper',
-                                  width: 50,
+                              Container(
+                                  color: Colors.transparent,
                                   height: 50,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
+                                  width: 50,
+                                  child: ClipRRect(
+                                    borderRadius: const BorderRadius.all(
+                                        Radius.circular(100)),
+                                    child: CachedNetworkImage(
+                                        fit: BoxFit.cover,
+                                        width: 50,
+                                        height: 50,
+                                        imageUrl: _apipegawai
+                                            .getImage(imageUrl ?? ''),
+                                        progressIndicatorBuilder:
+                                            (context, url, progress) {
+                                          return Center(
+                                            child: CircularProgressIndicator(
+                                              value: progress.totalSize != null
+                                                  ? progress.downloaded /
+                                                      (progress.totalSize ?? 1)
+                                                  : null,
+                                            ),
+                                          );
+                                        },
+                                        errorWidget: (context, url, error) =>
+                                            AvatarPlus(
+                                              name,
+                                              width: 50,
+                                              height: 50,
+                                              fit: BoxFit.cover,
+                                            )),
+                                  )),
                               const SizedBox(
                                 width: 15,
                               ),
                               SizedBox(
+                                width: 120,
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Text(
-                                      name,
-                                      style: const TextStyle(
-                                          color: Color(0xFFFFFFFF),
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w700),
+                                    Flexible(
+                                      child: Text(
+                                        name,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                            color: Color(0xFFFFFFFF),
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700),
+                                      ),
                                     ),
                                     Text(
                                       otority,
@@ -168,7 +238,9 @@ class _SettingpageState extends State<Settingpage> {
                             Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => const Kelolaoutlet(),
+                                  builder: (context) => Kelolaoutlet(
+                                    premisOutlet: widget.permisOutlet,
+                                  ),
                                 ));
                           },
                           child: Container(
@@ -253,6 +325,58 @@ class _SettingpageState extends State<Settingpage> {
                                     ),
                                     Text(
                                       'Pajak & servis atur disini',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                          color: const Color(0xFFA3A3A3)),
+                                    )
+                                  ],
+                                )
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(
+                          height: 16,
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const Pembayaran(),
+                                ));
+                          },
+                          child: Container(
+                            height: 58,
+                            padding: const EdgeInsets.symmetric(
+                                vertical: 8, horizontal: 16),
+                            decoration: const BoxDecoration(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(12)),
+                                color: Color(0xFFFFFFFF)),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.start,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SvgIcon.SvgPicture.asset(
+                                    'asset/setting/wallet.svg'),
+                                const SizedBox(
+                                  width: 16,
+                                ),
+                                const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Pengaturan Pembayaran',
+                                      style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w500,
+                                          color: const Color(0xFF0B0C17)),
+                                    ),
+                                    Text(
+                                      'Rekening dan e-wallet atur disini',
                                       style: TextStyle(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w500,

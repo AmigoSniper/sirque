@@ -2,6 +2,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:salescheck/Model/biayaTambahanModel.dart';
+import 'package:salescheck/Service/ApiBiayaTambahan.dart';
 import 'package:salescheck/component/inputTextField.dart';
 
 class Biayatambahan extends StatefulWidget {
@@ -12,6 +14,8 @@ class Biayatambahan extends StatefulWidget {
 }
 
 class _BiayatambahanState extends State<Biayatambahan> {
+  Apibiayatambahan _apibiayatambahan = Apibiayatambahan();
+  List<biayaTambahanModel> biaya = [];
   bool pajakEnable = false;
   bool biayaOperasionalEnable = false;
   int pajak = 0;
@@ -23,10 +27,22 @@ class _BiayatambahanState extends State<Biayatambahan> {
   bool focusbiayaOperasional = false;
   FocusNode _focusNodepajak = FocusNode();
   FocusNode _focusNodebiayaOperasional = FocusNode();
+  Future<void> _readAndPrintBiaya() async {
+    biaya = await _apibiayatambahan.getBiayaTambahan();
+    setState(() {
+      biaya = biaya;
+      pajakEnable = biaya.first.status ?? false;
+      biayaOperasionalEnable = biaya.last.status ?? false;
+      pajakcontroler.text = biaya.first.nilaiPajak!.replaceAll('%', '') ?? '0';
+      biayaOperasionalcontroler.text =
+          biaya.last.nilaiPajak!.replaceAll('%', '') ?? '0';
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    _readAndPrintBiaya();
     _focusNodepajak.addListener(() {
       setState(() {
         focusPajak = _focusNodepajak.hasFocus;
@@ -93,10 +109,12 @@ class _BiayatambahanState extends State<Biayatambahan> {
                               trackColor: const Color(0xFFE2E8F0),
                               thumbColor: const Color(0xFFFFFFFF),
                               value: pajakEnable,
-                              onChanged: (value) {
+                              onChanged: (value) async {
                                 setState(() {
                                   pajakEnable = value;
                                 });
+                                await _apibiayatambahan.editstatusbiayaTambahan(
+                                    biaya.first.id ?? 0, pajakEnable);
                               },
                             )),
                       ],
@@ -149,6 +167,12 @@ class _BiayatambahanState extends State<Biayatambahan> {
                                                 );
                                               }
                                             }
+                                          },
+                                          onSubmit: () {
+                                            _apibiayatambahan
+                                                .editnilaibiayaTambahan(
+                                                    biaya.first.id ?? 0,
+                                                    '${pajakcontroler.text}%');
                                           },
                                         )),
                                         const SizedBox(
@@ -230,10 +254,12 @@ class _BiayatambahanState extends State<Biayatambahan> {
                               trackColor: const Color(0xFFE2E8F0),
                               thumbColor: const Color(0xFFFFFFFF),
                               value: biayaOperasionalEnable,
-                              onChanged: (value) {
+                              onChanged: (value) async {
                                 setState(() {
                                   biayaOperasionalEnable = value;
                                 });
+                                await _apibiayatambahan.editstatusbiayaTambahan(
+                                    biaya.last.id ?? 0, biayaOperasionalEnable);
                               },
                             )),
                       ],
@@ -290,6 +316,12 @@ class _BiayatambahanState extends State<Biayatambahan> {
                                                 );
                                               }
                                             }
+                                          },
+                                          onSubmit: () {
+                                            _apibiayatambahan
+                                                .editnilaibiayaTambahan(
+                                                    biaya.last.id ?? 0,
+                                                    '${biayaOperasionalcontroler.text}%');
                                           },
                                         )),
                                         const SizedBox(

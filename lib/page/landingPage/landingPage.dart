@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:intl/intl.dart';
 
 import 'package:salescheck/page/landingPage/homepage.dart';
 import 'package:salescheck/page/landingPage/settingpage.dart';
@@ -8,7 +7,11 @@ import 'package:salescheck/page/landingPage/stockpage.dart';
 import 'package:salescheck/page/landingPage/transaksipage.dart';
 
 class Landingpage extends StatefulWidget {
-  const Landingpage({super.key});
+  final int? idOutlab;
+  final int? indexOutlab;
+  final bool? boolpermis;
+  const Landingpage(
+      {super.key, this.idOutlab, this.indexOutlab, this.boolpermis});
 
   @override
   State<Landingpage> createState() => _LandingpageState();
@@ -43,10 +46,18 @@ class _LandingpageState extends State<Landingpage> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> _children = [
-      Homepage(navigateToStockTab: navigateToStockTab),
+      Homepage(
+        navigateToStockTab: navigateToStockTab,
+        indexOutlab: widget.indexOutlab,
+        idOutlab: widget.idOutlab,
+      ),
       const Transaksipage(),
-      const Stockpage(),
-      const Settingpage()
+      Stockpage(
+        ouletidTransaksi: widget.idOutlab ?? null,
+      ),
+      Settingpage(
+        permisOutlet: widget.boolpermis,
+      )
     ];
     return Scaffold(
       bottomNavigationBar: Container(

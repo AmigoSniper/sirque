@@ -38,21 +38,19 @@ class _DetailbarangState extends State<Detailbarang> {
   FocusNode _focusNodestock = FocusNode();
   Future<void> _requestPermission() async {
     PermissionStatus status = await Permission.manageExternalStorage.status;
-    print('Memnita permission');
+
     if (status.isDenied || status.isPermanentlyDenied) {
       await Permission.manageExternalStorage.request();
-      print('Ditolak permission');
+
       // _showPermissionDialog(); // Tampilkan Alert Dialog jika izin ditolak
       setState(() {
         permissionGalery = false;
       });
     } else if (status.isGranted) {
-      print('Diterima permission');
       setState(() {
         permissionGalery = true;
       });
     } else {
-      print('Memnita ulang permission');
       await Permission.photos.request(); // Meminta izin
       if (await Permission.photos.isGranted) {
         _pickImage(); // Lanjutkan jika izin diberikan setelah diminta
@@ -464,12 +462,10 @@ class _DetailbarangState extends State<Detailbarang> {
                                   FilteringTextInputFormatter.digitsOnly
                                 ],
                                 onSubmitted: (value) {
-                                  print(value);
                                   String harganya =
                                       value.replaceAll(RegExp(r'[^\d]'), '');
-                                  print(harganya);
+
                                   int hargatotal = int.parse(harganya);
-                                  print(hargatotal + 10000);
                                 },
                                 style: GoogleFonts.openSans(
                                     color: const Color(0xFF101010),

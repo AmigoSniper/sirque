@@ -1,6 +1,5 @@
+import 'dart:convert';
 import 'dart:io';
-
-import 'package:dropdown_button2/dropdown_button2.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,13 +9,16 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:image_cropper/image_cropper.dart';
-
-import 'package:google_fonts/google_fonts.dart';
 import 'package:animated_snack_bar/animated_snack_bar.dart';
+import 'package:salescheck/Model/category.dart';
+import 'package:salescheck/Service/Api.dart';
+import 'package:salescheck/Service/ApiCategory.dart';
+import 'package:salescheck/Service/ApiProduct.dart';
 import 'package:salescheck/component/customButtonPrimary.dart';
 import 'package:salescheck/component/customButtonColor.dart';
 import 'package:salescheck/component/customDropDown.dart';
 import 'package:salescheck/component/inputTextField.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Addbarang extends StatefulWidget {
   const Addbarang({super.key});
@@ -26,7 +28,12 @@ class Addbarang extends StatefulWidget {
 }
 
 class _AddbarangState extends State<Addbarang> {
+  // final Api _api = Api();
+  final Apicategory _api = Apicategory();
+  final Apiproduct _apiproduct = Apiproduct();
+  List<Category> categoryOption = [Category()];
   final numberFormat = NumberFormat('#,##0', 'id');
+  int? idCategory;
   File? _image;
   bool permissionGalery = false;
   final TextEditingController namecontroler = TextEditingController();
@@ -46,25 +53,23 @@ class _AddbarangState extends State<Addbarang> {
   FocusNode _focusNodeharga = FocusNode();
   FocusNode _focusNodestock = FocusNode();
   String? selectedKategori;
-  List<String> kategoriOptions = ['Bola', 'Raket', 'Sepatu', 'Kaos'];
+  List<String> kategoriOptions = [];
 
   Future<void> _requestPermission() async {
     PermissionStatus status = await Permission.manageExternalStorage.status;
-    print('Memnita permission');
+
     if (status.isDenied || status.isPermanentlyDenied) {
       await Permission.manageExternalStorage.request();
-      print('Ditolak permission');
+
       // _showPermissionDialog(); // Tampilkan Alert Dialog jika izin ditolak
       setState(() {
         permissionGalery = false;
       });
     } else if (status.isGranted) {
-      print('Diterima permission');
       setState(() {
         permissionGalery = true;
       });
     } else {
-      print('Memnita ulang permission');
       await Permission.photos.request(); // Meminta izin
       if (await Permission.photos.isGranted) {
         _pickImage(); // Lanjutkan jika izin diberikan setelah diminta
@@ -138,6 +143,29 @@ class _AddbarangState extends State<Addbarang> {
     return null;
   }
 
+  Future<void> _readAndPrintCategoryData() async {
+    categoryOption = await _api.getCategory();
+    if (_api.statusCode == 200) {
+      setState(() {
+        for (var element in categoryOption) {
+          kategoriOptions.add(element.namaKategori!);
+        }
+      });
+    } else {}
+  }
+
+  Future<void> selectCategory() async {
+    final category = categoryOption.firstWhere(
+      (category) => category.namaKategori == selectedKategori,
+      orElse: () => Category(),
+    );
+
+    // Ambil id_outlet
+    setState(() {
+      idCategory = category.idKategori;
+    });
+  }
+
   void _showForm(BuildContext context, String namaBarang) {
     showModalBottomSheet(
       context: context,
@@ -149,6 +177,12 @@ class _AddbarangState extends State<Addbarang> {
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
+              Container(
+                width: 50,
+                height: 4,
+                color: const Color(0xFFE9E9E9),
+                margin: const EdgeInsets.only(bottom: 16),
+              ),
               Text(
                 'Apakah anda yakin ingin menyimpan produk $namaBarang?',
                 textAlign: TextAlign.center,
@@ -178,7 +212,7 @@ class _AddbarangState extends State<Addbarang> {
                             style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
-                                color: Color(0xFFFF3E1D)),
+                                color: Color(0xFF09090B)),
                           ))),
                   const SizedBox(
                     width: 8,
@@ -188,10 +222,31 @@ class _AddbarangState extends State<Addbarang> {
                           height: 48,
                           alignment: Alignment.center,
                           color: const Color(0xFFDEDEDE),
-                          onPressed: () {
+                          onPressed: () async {
+                            final SharedPreferences prefs =
+                                await SharedPreferences.getInstance();
+                            final int idOutlet = prefs.getInt('id_outlet') ?? 0;
+
+                            await _apiproduct.addProductApi(
+                                image: _image,
+                                nama: namecontroler.text,
+                                description: deskripsicontroler.text,
+                                price: double.parse(hargacontroler.text
+                                    .replaceAll(RegExp(r'[^\d]'), '')),
+                                idCategori: idCategory ?? 10,
+                                idOutlet: idOutlet,
+                                stock: stokcTakTerbatas
+                                    ? 0
+                                    : int.parse(stockcontroler.text),
+                                unlimitedStock: stokcTakTerbatas);
                             Navigator.pop(context);
-                            Navigator.pop(context,
-                                'Barang $namaBarang berhasil disimpan!');
+                            if (_apiproduct.statusCode == 201 ||
+                                _apiproduct.statusCode == 200) {
+                              Navigator.pop(context,
+                                  'Barang $namaBarang berhasil disimpan!');
+                            } else {
+                              null;
+                            }
                           },
                           child: const Text(
                             'Ya, saya yakin',
@@ -223,6 +278,7 @@ class _AddbarangState extends State<Addbarang> {
   void initState() {
     // TODO: implement initState
     super.initState();
+    _readAndPrintCategoryData();
 
     _requestPermission();
     hargacontroler.addListener(() {
@@ -468,9 +524,10 @@ class _AddbarangState extends State<Addbarang> {
                                     labelForm('Kategori'),
                                     Customdropdown(
                                         data: kategoriOptions,
-                                        onChanged: (String? value) {
+                                        onChanged: (String? value) async {
                                           setState(() {
                                             selectedKategori = value;
+                                            selectCategory();
                                           });
                                         },
                                         hintText: 'Pilih kategori',
@@ -658,9 +715,9 @@ class _AddbarangState extends State<Addbarang> {
                             if (validForm()) {
                               String harganya = hargacontroler.text
                                   .replaceAll(RegExp(r'[^\d]'), '');
-                              print(harganya);
+
                               int hargatotal = int.parse(harganya);
-                              print(hargatotal + 10000);
+
                               _showForm(context, namecontroler.text);
                             } else {
                               AnimatedSnackBar.material(
@@ -670,7 +727,7 @@ class _AddbarangState extends State<Addbarang> {
                             }
                           },
                           child: const Text(
-                            'Simpan Kategori',
+                            'Simpan Barang',
                             style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -685,9 +742,9 @@ class _AddbarangState extends State<Addbarang> {
                             if (validForm()) {
                               String harganya = hargacontroler.text
                                   .replaceAll(RegExp(r'[^\d]'), '');
-                              print(harganya);
+
                               int hargatotal = int.parse(harganya);
-                              print(hargatotal + 10000);
+
                               _showForm(context, namecontroler.text);
                             } else {
                               AnimatedSnackBar.material(
@@ -697,7 +754,7 @@ class _AddbarangState extends State<Addbarang> {
                             }
                           },
                           child: const Text(
-                            'Simpan Kategori',
+                            'Simpan Barang',
                             style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,

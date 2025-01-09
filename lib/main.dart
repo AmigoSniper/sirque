@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'package:salescheck/page/landingPage/landingPage.dart';
 
 import 'page/SplashScreen.dart';
 
 Future<void> main() async {
+  await dotenv.load();
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id', null);
   runApp(const MainApp());
@@ -33,7 +35,7 @@ class MainApp extends StatelessWidget {
       },
       debugShowCheckedModeBanner: false,
       theme: ThemeData(fontFamily: 'geist'),
-      home: const Scaffold(body: Splashscreen()),
+      home: const Splashscreen(),
     );
   }
 }

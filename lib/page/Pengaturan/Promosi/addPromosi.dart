@@ -5,6 +5,8 @@ import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:salescheck/Model/outlets.dart';
+import 'package:salescheck/Service/ApiPromosi.dart';
 import 'package:salescheck/component/customDropDown.dart';
 import 'package:salescheck/component/inputTextField.dart';
 
@@ -12,13 +14,15 @@ import '../../../component/customButtonPrimary.dart';
 import '../../../component/customButtonColor.dart';
 
 class Addpromosi extends StatefulWidget {
-  const Addpromosi({super.key});
+  final List<Outlets> outletOptions;
+  const Addpromosi({super.key, required this.outletOptions});
 
   @override
   State<Addpromosi> createState() => _AddpromosiState();
 }
 
 class _AddpromosiState extends State<Addpromosi> {
+  final Apipromosi _apipromosi = new Apipromosi();
   final numberFormat = NumberFormat('#,##0', 'id');
   final TextEditingController namecontroler = TextEditingController();
   final TextEditingController deskripsicontroler = TextEditingController();
@@ -47,11 +51,11 @@ class _AddpromosiState extends State<Addpromosi> {
   String? outletSelect;
   List<String> outletOptions = [
     'Semua',
-    'West Coast Coffee',
-    'North Coast Coffee',
-    'East Coast Coffee',
-    'South Coast Coffee'
   ];
+  List<String> outletsort = [
+    'Semua',
+  ];
+  List<Outlets> idOutlet = [];
   List<String> days = [
     "Senin",
     "Selasa",
@@ -272,7 +276,6 @@ class _AddpromosiState extends State<Addpromosi> {
                               setState(() {
                                 daysSelect = sortDays(daysSelectModal);
                               });
-                              print("Days selected: $daysSelect");
                             },
                             child: const Text(
                               'Simpan',
@@ -348,10 +351,30 @@ class _AddpromosiState extends State<Addpromosi> {
                     child: customButtonPrimary(
                         alignment: Alignment.center,
                         height: 48,
-                        onPressed: () {
-                          Navigator.pop(context);
-                          Navigator.pop(context,
-                              'Promosi ${namecontroler.text} berhasil ditambahkan');
+                        onPressed: () async {
+                          await _apipromosi.addPromosiApi(
+                              nama: namecontroler.text,
+                              description: deskripsicontroler.text,
+                              tipeAktivasi: tipeAktivasiSelect ?? '',
+                              minimalBeli: int.parse(minimalPembeliancontroler
+                                  .text
+                                  .replaceAll(RegExp(r'[^\d]'), '')),
+                              kategori: tipeDiskonSelect == 'Tipe Potongan (%)'
+                                  ? '%'
+                                  : 'Rp',
+                              nilaikategori: int.parse(tipediskoncontroler.text
+                                  .replaceAll(RegExp(r'[^\d]'), '')),
+                              tanggalMulai: tanggalMulaicontroler.text,
+                              tanggalBerakhir: tanggalBerakhircontroler.text,
+                              jamMulai: jamMulaicontroler.text,
+                              jamBerakhir: jamBerakhircontroler.text,
+                              hari: daysSelect,
+                              idOutlet: idOutlet);
+                          if (_apipromosi.statusCode == 201) {
+                            Navigator.pop(context);
+                            Navigator.pop(context,
+                                'Promosi ${namecontroler.text} berhasil ditambahkan');
+                          } else {}
                         },
                         child: const Text(
                           'Simpan',
@@ -429,9 +452,19 @@ class _AddpromosiState extends State<Addpromosi> {
     return true;
   }
 
+  Future<void> _readAndPrintOutlet() async {
+    setState(() {
+      for (var element in widget.outletOptions) {
+        outletOptions.add(element.namaOutlet ?? '');
+        outletsort.add(element.namaOutlet ?? '');
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
+    _readAndPrintOutlet();
     tipeAktivasiSelect = aktivasiOptions.first;
     jamMulaicontroler.text = '00:00';
     jamBerakhircontroler.text = '23:59';
@@ -539,29 +572,40 @@ class _AddpromosiState extends State<Addpromosi> {
                                       Customdropdown(
                                           data: outletOptions,
                                           onChanged: (String? newvalue) {
-                                            if (newvalue?.toLowerCase() ==
-                                                'semua') {
-                                              for (var i = 1;
-                                                  i < outletOptions.length;
-                                                  i++) {
+                                            if (newvalue != null) {
+                                              if (newvalue.toLowerCase() ==
+                                                  'semua') {
+                                                for (var i = 1;
+                                                    i < outletOptions.length;
+                                                    i++) {
+                                                  setState(() {
+                                                    listoutletSelect
+                                                        .add(outletOptions[i]);
+                                                    idOutlet.add(widget
+                                                        .outletOptions[i - 1]);
+                                                  });
+                                                }
+
+                                                setState(() {
+                                                  outletOptions.clear();
+                                                  outletOptions.add('Semua');
+                                                });
+                                              } else {
                                                 setState(() {
                                                   listoutletSelect
-                                                      .add(outletOptions[i]);
+                                                      .add(newvalue);
+
+                                                  int selectedIndex =
+                                                      outletOptions
+                                                          .indexOf(newvalue);
+                                                  idOutlet.add(
+                                                      widget.outletOptions[
+                                                          selectedIndex - 1]);
+
+                                                  outletOptions
+                                                      .remove(newvalue);
                                                 });
                                               }
-                                              for (var i = 0;
-                                                  i < listoutletSelect.length;
-                                                  i++) {
-                                                setState(() {
-                                                  outletOptions.remove(
-                                                      listoutletSelect[i]);
-                                                });
-                                              }
-                                            } else {
-                                              setState(() {
-                                                listoutletSelect.add(newvalue!);
-                                                outletOptions.remove(newvalue);
-                                              });
                                             }
                                           },
                                           hintText: 'Pilih Outlet',
@@ -656,10 +700,47 @@ class _AddpromosiState extends State<Addpromosi> {
                                                                       .zero,
                                                               onPressed: () {
                                                                 setState(() {
+                                                                  // Kembalikan outlet yang dihapus ke outletOptions
                                                                   outletOptions.add(
                                                                       listoutletSelect[
                                                                           index]);
+                                                                  outletOptions
+                                                                      .sort((a,
+                                                                          b) {
+                                                                    // Pastikan 'Semua' tetap di atas
+                                                                    if (a ==
+                                                                        'Semua')
+                                                                      return -1;
+                                                                    if (b ==
+                                                                        'Semua')
+                                                                      return 1;
+
+                                                                    // Jika tidak, urutkan berdasarkan urutan yang ada di outletList
+                                                                    int indexA =
+                                                                        outletsort
+                                                                            .indexOf(a);
+                                                                    int indexB =
+                                                                        outletsort
+                                                                            .indexOf(b);
+
+                                                                    // Jika elemen tidak ada di outletList, beri nilai lebih tinggi (terakhir diurutkan)
+                                                                    if (indexA ==
+                                                                        -1)
+                                                                      return 1;
+                                                                    if (indexB ==
+                                                                        -1)
+                                                                      return -1;
+
+                                                                    return indexA
+                                                                        .compareTo(
+                                                                            indexB); // Urutkan berdasarkan urutan di outletList
+                                                                  });
+                                                                  // Hapus outlet dari listoutletSelect
                                                                   listoutletSelect
+                                                                      .removeAt(
+                                                                          index);
+                                                                  // Kembalikan outlet yang dihapus dari idOutlet (jika perlu)
+                                                                  idOutlet
                                                                       .removeAt(
                                                                           index);
                                                                 });
@@ -767,7 +848,7 @@ class _AddpromosiState extends State<Addpromosi> {
                                               });
                                             },
                                             hintText: 'Tipe Potongan',
-                                            heightItem: 40),
+                                            heightItem: 50),
                                         const SizedBox(
                                           width: 8,
                                         ),
@@ -776,7 +857,7 @@ class _AddpromosiState extends State<Addpromosi> {
                                           alignment: Alignment.centerLeft,
                                           padding: const EdgeInsets.symmetric(
                                               vertical: 4, horizontal: 16),
-                                          height: 40,
+                                          height: 50,
                                           hintText: 'Nilai',
                                           keyboardType: TextInputType.number,
                                           controller: tipediskoncontroler,
@@ -945,7 +1026,6 @@ class _AddpromosiState extends State<Addpromosi> {
                                           Flexible(
                                             child: FormBuilderDateTimePicker(
                                               onChanged: (value) {
-                                                print(value);
                                                 setState(() {});
                                               },
                                               format: DateFormat(
@@ -955,6 +1035,8 @@ class _AddpromosiState extends State<Addpromosi> {
                                               controller: tanggalMulaicontroler,
                                               initialEntryMode:
                                                   DatePickerEntryMode.calendar,
+                                              initialDatePickerMode:
+                                                  DatePickerMode.day,
                                               inputType: InputType.date,
                                               style: const TextStyle(
                                                 color: Color(0xFF101010),
@@ -1009,7 +1091,6 @@ class _AddpromosiState extends State<Addpromosi> {
                                           Flexible(
                                             child: FormBuilderDateTimePicker(
                                               onChanged: (value) {
-                                                print(value);
                                                 setState(() {});
                                               },
                                               format: DateFormat(
@@ -1084,7 +1165,6 @@ class _AddpromosiState extends State<Addpromosi> {
                                           Flexible(
                                             child: FormBuilderDateTimePicker(
                                               onChanged: (value) {
-                                                print(value);
                                                 setState(() {});
                                               },
                                               name: 'JamMulai',
@@ -1155,10 +1235,7 @@ class _AddpromosiState extends State<Addpromosi> {
                                           Flexible(
                                             child: FormBuilderDateTimePicker(
                                               onChanged: (value) {
-                                                print(value);
                                                 setState(() {});
-                                                print(
-                                                    jamBerakhircontroler.text);
                                               },
                                               name: 'JamBerakhir',
                                               format: DateFormat('HH:mm'),
@@ -1272,13 +1349,9 @@ class _AddpromosiState extends State<Addpromosi> {
                           alignment: Alignment.center,
                           height: 48,
                           onPressed: () {
-                            print('data berhasil masuk');
                             if (validateForm()) {
-                              print('data berhasil masuk');
                               _confirmModal(context, namecontroler.text);
-                            } else {
-                              print('Isi data');
-                            }
+                            } else {}
                           },
                           child: const Text(
                             'Simpan',
