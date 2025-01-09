@@ -1,4 +1,4 @@
-# salescheck
+# Sirque
 
 A new Flutter project.
 
